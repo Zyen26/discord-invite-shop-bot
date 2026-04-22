@@ -1,6 +1,6 @@
 const path = require('path');
 const fs = require('fs');
-const sqlite3 = require('sqlite3').verbose();
+const Database = require('better-sqlite3');
 
 const dbPath = process.env.SQLITE_PATH || path.join(__dirname, 'bot.db');
 const dbDir = path.dirname(dbPath);
@@ -11,13 +11,8 @@ if (!fs.existsSync(dbDir)) {
 
 console.log(`📦 SQLite path: ${dbPath}`);
 
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
-    console.error('❌ Database open error:', err.message);
-  } else {
-    console.log('✅ Connected to SQLite database');
-  }
-});
+const db = new Database(dbPath);
+console.log('✅ Connected to SQLite database');
 
 db.serialize(() => {
   db.run(`
