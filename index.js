@@ -13,6 +13,7 @@ const {
   TextInputStyle
 } = require('discord.js');
 const db = require('./database');
+
 const inviteTracker = new Map();
 
 const client = new Client({
@@ -37,7 +38,9 @@ const NORMAL_LOG_RETENTION_DAYS = Number(process.env.NORMAL_LOG_RETENTION_DAYS |
 const SECURITY_LOG_RETENTION_DAYS = Number(process.env.SECURITY_LOG_RETENTION_DAYS || 30);
 const NEW_MEMBER_PROTECTION_MINUTES = Number(process.env.NEW_MEMBER_PROTECTION_MINUTES || 10);
 const HIGH_RISK_THRESHOLD = Number(process.env.HIGH_RISK_THRESHOLD || 12);
+
 const buyCooldowns = new Map();
+
 const REQUIRED_ENV_VARS = [
   'DISCORD_TOKEN'
 ];
@@ -118,7 +121,6 @@ function trackInvite(inviterId, isNewAccount, isDefaultAvatar) {
     isDefaultAvatar
   });
 
-  // 只保留1小时
   const oneHour = 60 * 60 * 1000;
 
   inviteTracker.set(
@@ -129,332 +131,318 @@ function trackInvite(inviterId, isNewAccount, isDefaultAvatar) {
 
 function initPurchaseHistoryTable() {
   return new Promise((resolve, reject) => {
-    db.run(
-      `CREATE TABLE IF NOT EXISTS purchase_history (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id TEXT NOT NULL,
-        product_id INTEGER NOT NULL,
-        product_name TEXT NOT NULL,
-        code_value TEXT NOT NULL,
-        delivered_via TEXT NOT NULL DEFAULT 'dm',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )`,
-      (err) => {
-        if (err) {
-          console.error('initPurchaseHistoryTable error:', err.message);
-          return reject(err);
-        }
-        resolve();
-      }
-    );
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS purchase_history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id TEXT NOT NULL,
+          product_id INTEGER NOT NULL,
+          product_name TEXT NOT NULL,
+          code_value TEXT NOT NULL,
+          delivered_via TEXT NOT NULL DEFAULT 'dm',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      resolve();
+    } catch (err) {
+      console.error('initPurchaseHistoryTable error:', err.message);
+      reject(err);
+    }
   });
 }
 
 function savePurchaseHistory(userId, product, codeValue, deliveredVia = 'dm') {
   return new Promise((resolve, reject) => {
-    db.run(
-      `INSERT INTO purchase_history (user_id, product_id, product_name, code_value, delivered_via)
-       VALUES (?, ?, ?, ?, ?)`,
-      [userId, product.id, product.name, codeValue, deliveredVia],
-      function (err) {
-        if (err) {
-          console.error('savePurchaseHistory error:', err.message);
-          return reject(err);
-        }
-        resolve({ id: this.lastID });
-      }
-    );
+    try {
+      const stmt = db.prepare(`
+        INSERT INTO purchase_history (user_id, product_id, product_name, code_value, delivered_via)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+
+      const result = stmt.run(
+        userId,
+        product.id,
+        product.name,
+        codeValue,
+        deliveredVia
+      );
+
+      resolve({ id: Number(result.lastInsertRowid) });
+    } catch (err) {
+      console.error('savePurchaseHistory error:', err.message);
+      reject(err);
+    }
   });
 }
 
 function getUserPurchaseHistory(userId, limit = 10) {
   return new Promise((resolve, reject) => {
-    db.all(
-      `SELECT * FROM purchase_history
-       WHERE user_id = ?
-       ORDER BY created_at DESC, id DESC
-       LIMIT ?`,
-      [userId, limit],
-      (err, rows) => {
-        if (err) {
-          console.error('getUserPurchaseHistory error:', err.message);
-          return reject(err);
-        }
-        resolve(rows || []);
-      }
-    );
+    try {
+      const rows = db.prepare(`
+        SELECT * FROM purchase_history
+        WHERE user_id = ?
+        ORDER BY created_at DESC, id DESC
+        LIMIT ?
+      `).all(userId, limit);
+
+      resolve(rows || []);
+    } catch (err) {
+      console.error('getUserPurchaseHistory error:', err.message);
+      reject(err);
+    }
   });
 }
 
 function getLatestUserPurchase(userId) {
   return new Promise((resolve, reject) => {
-    db.get(
-      `SELECT * FROM purchase_history
-       WHERE user_id = ?
-       ORDER BY created_at DESC, id DESC
-       LIMIT 1`,
-      [userId],
-      (err, row) => {
-        if (err) {
-          console.error('getLatestUserPurchase error:', err.message);
-          return reject(err);
-        }
-        resolve(row || null);
-      }
-    );
+    try {
+      const row = db.prepare(`
+        SELECT * FROM purchase_history
+        WHERE user_id = ?
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+      `).get(userId);
+
+      resolve(row || null);
+    } catch (err) {
+      console.error('getLatestUserPurchase error:', err.message);
+      reject(err);
+    }
   });
 }
 
 function getStockByProduct(productId) {
   return new Promise((resolve, reject) => {
-    db.get(
-      `SELECT COUNT(*) as count FROM codes WHERE product_id = ? AND is_used = 0`,
-      [productId],
-      (err, row) => {
-        if (err) {
-          console.error('getStockByProduct error:', err.message);
-          return reject(err);
-        }
-        resolve(row?.count || 0);
-      }
-    );
+    try {
+      const row = db.prepare(`
+        SELECT COUNT(*) as count
+        FROM codes
+        WHERE product_id = ? AND is_used = 0
+      `).get(productId);
+
+      resolve(row?.count || 0);
+    } catch (err) {
+      console.error('getStockByProduct error:', err.message);
+      reject(err);
+    }
   });
 }
 
 function getAllStock() {
   return new Promise((resolve, reject) => {
-    db.all(
-      `SELECT product_id, COUNT(*) as count
-       FROM codes
-       WHERE is_used = 0
-       GROUP BY product_id
-       ORDER BY product_id ASC`,
-      [],
-      (err, rows) => {
-        if (err) {
-          console.error('getAllStock error:', err.message);
-          return reject(err);
-        }
-        resolve(rows || []);
-      }
-    );
+    try {
+      const rows = db.prepare(`
+        SELECT product_id, COUNT(*) as count
+        FROM codes
+        WHERE is_used = 0
+        GROUP BY product_id
+        ORDER BY product_id ASC
+      `).all();
+
+      resolve(rows || []);
+    } catch (err) {
+      console.error('getAllStock error:', err.message);
+      reject(err);
+    }
   });
 }
 
 function getOrCreateUser(userId) {
   return new Promise((resolve, reject) => {
-    db.get(`SELECT * FROM users WHERE user_id = ?`, [userId], (err, row) => {
-      if (err) {
-        console.error('getOrCreateUser/select error:', err.message);
-        return reject(err);
+    try {
+      let row = db.prepare(`
+        SELECT * FROM users WHERE user_id = ?
+      `).get(userId);
+
+      if (row) {
+        resolve(row);
+        return;
       }
 
-      if (row) return resolve(row);
+      db.prepare(`
+        INSERT INTO users (user_id, points, invite_count)
+        VALUES (?, 0, 0)
+      `).run(userId);
 
-      db.run(
-        `INSERT INTO users (user_id, points, invite_count) VALUES (?, 0, 0)`,
-        [userId],
-        function (insertErr) {
-          if (insertErr) {
-            console.error('getOrCreateUser/insert error:', insertErr.message);
-            return reject(insertErr);
-          }
+      row = db.prepare(`
+        SELECT * FROM users WHERE user_id = ?
+      `).get(userId);
 
-          db.get(`SELECT * FROM users WHERE user_id = ?`, [userId], (err2, newRow) => {
-            if (err2) {
-              console.error('getOrCreateUser/reselect error:', err2.message);
-              return reject(err2);
-            }
-            resolve(newRow);
-          });
-        }
-      );
-    });
+      resolve(row || null);
+    } catch (err) {
+      console.error('getOrCreateUser error:', err.message);
+      reject(err);
+    }
   });
 }
 
 function addPoints(userId, amount) {
   return new Promise((resolve, reject) => {
-    db.run(
-      `INSERT INTO users (user_id, points, invite_count)
-       VALUES (?, ?, 0)
-       ON CONFLICT(user_id) DO UPDATE SET points = points + ?`,
-      [userId, amount, amount],
-      function (err) {
-        if (err) {
-          console.error('addPoints error:', err.message);
-          return reject(err);
-        }
+    try {
+      db.prepare(`
+        INSERT INTO users (user_id, points, invite_count)
+        VALUES (?, ?, 0)
+        ON CONFLICT(user_id) DO UPDATE SET points = points + ?
+      `).run(userId, amount, amount);
 
-        db.get(`SELECT * FROM users WHERE user_id = ?`, [userId], (err2, row) => {
-          if (err2) {
-            console.error('addPoints/select error:', err2.message);
-            return reject(err2);
-          }
-          resolve(row);
-        });
-      }
-    );
+      const row = db.prepare(`
+        SELECT * FROM users WHERE user_id = ?
+      `).get(userId);
+
+      resolve(row || null);
+    } catch (err) {
+      console.error('addPoints error:', err.message);
+      reject(err);
+    }
   });
 }
 
 function addInvitePoint(userId) {
   return new Promise((resolve, reject) => {
-    db.run(
-      `INSERT INTO users (user_id, points, invite_count)
-       VALUES (?, 1, 1)
-       ON CONFLICT(user_id) DO UPDATE SET
-         points = points + 1,
-         invite_count = invite_count + 1`,
-      [userId],
-      function (err) {
-        if (err) {
-          console.error('addInvitePoint error:', err.message);
-          return reject(err);
-        }
+    try {
+      db.prepare(`
+        INSERT INTO users (user_id, points, invite_count)
+        VALUES (?, 1, 1)
+        ON CONFLICT(user_id) DO UPDATE SET
+          points = points + 1,
+          invite_count = invite_count + 1
+      `).run(userId);
 
-        db.get(`SELECT * FROM users WHERE user_id = ?`, [userId], (err2, row) => {
-          if (err2) {
-            console.error('addInvitePoint/select error:', err2.message);
-            return reject(err2);
-          }
-          resolve(row);
-        });
-      }
-    );
+      const row = db.prepare(`
+        SELECT * FROM users WHERE user_id = ?
+      `).get(userId);
+
+      resolve(row || null);
+    } catch (err) {
+      console.error('addInvitePoint error:', err.message);
+      reject(err);
+    }
   });
 }
 
 function hasInviteRecord(invitedUserId) {
   return new Promise((resolve, reject) => {
-    db.get(
-      `SELECT * FROM invites WHERE invited_user_id = ?`,
-      [invitedUserId],
-      (err, row) => {
-        if (err) {
-          console.error('hasInviteRecord error:', err.message);
-          return reject(err);
-        }
-        resolve(row || null);
-      }
-    );
+    try {
+      const row = db.prepare(`
+        SELECT * FROM invites WHERE invited_user_id = ?
+      `).get(invitedUserId);
+
+      resolve(row || null);
+    } catch (err) {
+      console.error('hasInviteRecord error:', err.message);
+      reject(err);
+    }
   });
 }
 
 function saveInviteRecord(invitedUserId, inviterId) {
   return new Promise((resolve, reject) => {
-    db.run(
-      `INSERT INTO invites (invited_user_id, inviter_id) VALUES (?, ?)`,
-      [invitedUserId, inviterId],
-      function (err) {
-        if (err) {
-          console.error('saveInviteRecord error:', err.message);
-          return reject(err);
-        }
-        resolve();
-      }
-    );
+    try {
+      db.prepare(`
+        INSERT INTO invites (invited_user_id, inviter_id)
+        VALUES (?, ?)
+      `).run(invitedUserId, inviterId);
+
+      resolve();
+    } catch (err) {
+      console.error('saveInviteRecord error:', err.message);
+      reject(err);
+    }
   });
 }
 
 function seedProducts() {
-  db.run(
-    `
-    INSERT INTO products (id, name, cost, active, risk_score)
-    VALUES (1, 'Gift Card 🪙', 10, 1, 2)
-    ON CONFLICT(id) DO UPDATE SET
-      name = excluded.name,
-      cost = excluded.cost,
-      active = excluded.active,
-      risk_score = excluded.risk_score
-    `,
-    (err) => {
-      if (err) console.error('seedProducts product 1 error:', err.message);
-      else console.log('✅ Product 1 ready');
-    }
-  );
+  try {
+    db.prepare(`
+      INSERT INTO products (id, name, cost, active, risk_score)
+      VALUES (1, 'Gift Card 🪙', 10, 1, 2)
+      ON CONFLICT(id) DO UPDATE SET
+        name = excluded.name,
+        cost = excluded.cost,
+        active = excluded.active,
+        risk_score = excluded.risk_score
+    `).run();
+    console.log('✅ Product 1 ready');
 
-  db.run(
-    `
-    INSERT INTO products (id, name, cost, active, risk_score)
-    VALUES (2, 'Royal Card 👑', 20, 1, 6)
-    ON CONFLICT(id) DO UPDATE SET
-      name = excluded.name,
-      cost = excluded.cost,
-      active = excluded.active,
-      risk_score = excluded.risk_score
-    `,
-    (err) => {
-      if (err) console.error('seedProducts product 2 error:', err.message);
-      else console.log('✅ Product 2 ready');
-    }
-  );
+    db.prepare(`
+      INSERT INTO products (id, name, cost, active, risk_score)
+      VALUES (2, 'Royal Card 👑', 20, 1, 6)
+      ON CONFLICT(id) DO UPDATE SET
+        name = excluded.name,
+        cost = excluded.cost,
+        active = excluded.active,
+        risk_score = excluded.risk_score
+    `).run();
+    console.log('✅ Product 2 ready');
+  } catch (err) {
+    console.error('seedProducts error:', err.message);
+  }
 }
 
 function getProducts() {
   return new Promise((resolve, reject) => {
-    db.all(
-      `SELECT * FROM products WHERE active = 1 ORDER BY id ASC`,
-      [],
-      (err, rows) => {
-        if (err) {
-          console.error('getProducts error:', err.message);
-          return reject(err);
-        }
-        resolve(rows || []);
-      }
-    );
+    try {
+      const rows = db.prepare(`
+        SELECT * FROM products
+        WHERE active = 1
+        ORDER BY id ASC
+      `).all();
+
+      resolve(rows || []);
+    } catch (err) {
+      console.error('getProducts error:', err.message);
+      reject(err);
+    }
   });
 }
 
 function addCode(productId, codeValue) {
   return new Promise((resolve, reject) => {
-    db.run(
-      `INSERT INTO codes (product_id, code_value, is_used) VALUES (?, ?, 0)`,
-      [productId, codeValue],
-      function (err) {
-        if (err) {
-          console.error('addCode error:', err.message);
-          return reject(err);
-        }
-        resolve({ id: this.lastID });
-      }
-    );
+    try {
+      const result = db.prepare(`
+        INSERT INTO codes (product_id, code_value, is_used)
+        VALUES (?, ?, 0)
+      `).run(productId, codeValue);
+
+      resolve({ id: Number(result.lastInsertRowid) });
+    } catch (err) {
+      console.error('addCode error:', err.message);
+      reject(err);
+    }
   });
 }
 
 function getProductById(productId) {
   return new Promise((resolve, reject) => {
-    db.get(
-      `SELECT * FROM products WHERE id = ? AND active = 1`,
-      [productId],
-      (err, row) => {
-        if (err) {
-          console.error('getProductById error:', err.message);
-          return reject(err);
-        }
-        resolve(row || null);
-      }
-    );
+    try {
+      const row = db.prepare(`
+        SELECT * FROM products
+        WHERE id = ? AND active = 1
+      `).get(productId);
+
+      resolve(row || null);
+    } catch (err) {
+      console.error('getProductById error:', err.message);
+      reject(err);
+    }
   });
 }
 
 function getTopInviters(limit = 10) {
   return new Promise((resolve, reject) => {
-    db.all(
-      `SELECT user_id, invite_count, points
-       FROM users
-       ORDER BY invite_count DESC, points DESC
-       LIMIT ?`,
-      [limit],
-      (err, rows) => {
-        if (err) {
-          console.error('getTopInviters error:', err.message);
-          return reject(err);
-        }
-        resolve(rows || []);
-      }
-    );
+    try {
+      const rows = db.prepare(`
+        SELECT user_id, invite_count, points
+        FROM users
+        ORDER BY invite_count DESC, points DESC
+        LIMIT ?
+      `).all(limit);
+
+      resolve(rows || []);
+    } catch (err) {
+      console.error('getTopInviters error:', err.message);
+      reject(err);
+    }
   });
 }
 
@@ -483,258 +471,284 @@ async function safeReply(interaction, payload) {
 
 function logAction(userId, action, detail = '') {
   return new Promise((resolve, reject) => {
-    db.run(
-      `INSERT INTO logs (user_id, action, detail) VALUES (?, ?, ?)`,
-      [userId || null, action, detail],
-      function (err) {
-        if (err) {
-          console.error('logAction error:', err.message);
-          return reject(err);
-        }
-        resolve(this.lastID);
-      }
-    );
+    try {
+      const result = db.prepare(`
+        INSERT INTO logs (user_id, action, detail)
+        VALUES (?, ?, ?)
+      `).run(userId || null, action, detail);
+
+      resolve(Number(result.lastInsertRowid));
+    } catch (err) {
+      console.error('logAction error:', err.message);
+      reject(err);
+    }
   });
 }
 
 function getRecentLogs(userId, seconds = 60) {
   return new Promise((resolve, reject) => {
-    db.all(
-      `SELECT * FROM logs
-       WHERE user_id = ?
-       AND created_at >= datetime('now', '-' || ? || ' seconds')
-       ORDER BY created_at DESC`,
-      [userId, seconds],
-      (err, rows) => {
-        if (err) {
-          console.error('getRecentLogs error:', err.message);
-          return reject(err);
-        }
-        resolve(rows || []);
-      }
-    );
+    try {
+      const rows = db.prepare(`
+        SELECT * FROM logs
+        WHERE user_id = ?
+        AND created_at >= datetime('now', '-' || ? || ' seconds')
+        ORDER BY created_at DESC
+      `).all(userId, seconds);
+
+      resolve(rows || []);
+    } catch (err) {
+      console.error('getRecentLogs error:', err.message);
+      reject(err);
+    }
   });
 }
 
 function getRecentSecurityLogsByUser(userId, limit = 10) {
   return new Promise((resolve, reject) => {
-    db.all(
-      `SELECT * FROM logs
-       WHERE user_id = ?
-       ORDER BY created_at DESC
-       LIMIT ?`,
-      [userId, limit],
-      (err, rows) => {
-        if (err) {
-          console.error('getRecentSecurityLogsByUser error:', err.message);
-          return reject(err);
-        }
-        resolve(rows || []);
-      }
-    );
+    try {
+      const rows = db.prepare(`
+        SELECT * FROM logs
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+        LIMIT ?
+      `).all(userId, limit);
+
+      resolve(rows || []);
+    } catch (err) {
+      console.error('getRecentSecurityLogsByUser error:', err.message);
+      reject(err);
+    }
   });
 }
 
 function getRecentSecurityLogs(limit = 10) {
   return new Promise((resolve, reject) => {
-    db.all(
-      `SELECT * FROM logs
-       ORDER BY created_at DESC
-       LIMIT ?`,
-      [limit],
-      (err, rows) => {
-        if (err) {
-          console.error('getRecentSecurityLogs error:', err.message);
-          return reject(err);
-        }
-        resolve(rows || []);
-      }
-    );
+    try {
+      const rows = db.prepare(`
+        SELECT * FROM logs
+        ORDER BY created_at DESC
+        LIMIT ?
+      `).all(limit);
+
+      resolve(rows || []);
+    } catch (err) {
+      console.error('getRecentSecurityLogs error:', err.message);
+      reject(err);
+    }
   });
 }
 
 function getSecuritySummary24h() {
   return new Promise((resolve, reject) => {
-    db.all(
-      `SELECT * FROM logs
-       WHERE action IN ('SECURITY_FLAG', 'AUTO_KICK', 'BUY_BLOCKED')
-       AND created_at >= datetime('now', '-24 hours')
-       ORDER BY created_at DESC`,
-      [],
-      (err, rows) => {
-        if (err) {
-          console.error('getSecuritySummary24h error:', err.message);
-          return reject(err);
-        }
+    try {
+      const rows = db.prepare(`
+        SELECT * FROM logs
+        WHERE action IN ('SECURITY_FLAG', 'AUTO_KICK', 'BUY_BLOCKED')
+        AND created_at >= datetime('now', '-24 hours')
+        ORDER BY created_at DESC
+      `).all();
 
-        const flags = rows.filter(r => r.action === 'SECURITY_FLAG');
-        const kicks = rows.filter(r => r.action === 'AUTO_KICK');
-        const blocked = rows.filter(r => r.action === 'BUY_BLOCKED');
-        const lastFlag = flags[0] || null;
-        const lastKick = kicks[0] || null;
+      const flags = rows.filter(r => r.action === 'SECURITY_FLAG');
+      const kicks = rows.filter(r => r.action === 'AUTO_KICK');
+      const blocked = rows.filter(r => r.action === 'BUY_BLOCKED');
+      const lastFlag = flags[0] || null;
+      const lastKick = kicks[0] || null;
 
-        resolve({
-          recentFlags24h: flags.length,
-          recentKicks24h: kicks.length,
-          blockedAttempts24h: blocked.length,
-          lastFlaggedUserId: lastFlag?.user_id || null,
-          lastFlaggedTime: lastFlag?.created_at || null,
-          lastAutoKick: !!lastKick,
-          lastAutoKickTime: lastKick?.created_at || null,
-          lastAutoKickUserId: lastKick?.user_id || null
-        });
-      }
-    );
+      resolve({
+        recentFlags24h: flags.length,
+        recentKicks24h: kicks.length,
+        blockedAttempts24h: blocked.length,
+        lastFlaggedUserId: lastFlag?.user_id || null,
+        lastFlaggedTime: lastFlag?.created_at || null,
+        lastAutoKick: !!lastKick,
+        lastAutoKickTime: lastKick?.created_at || null,
+        lastAutoKickUserId: lastKick?.user_id || null
+      });
+    } catch (err) {
+      console.error('getSecuritySummary24h error:', err.message);
+      reject(err);
+    }
   });
 }
 
 function getSecurityState(userId) {
   return new Promise((resolve, reject) => {
-    db.get(
-      `SELECT * FROM security_state WHERE user_id = ?`,
-      [userId],
-      (err, row) => {
-        if (err) {
-          console.error('getSecurityState error:', err.message);
-          return reject(err);
-        }
-        resolve(row || null);
-      }
-    );
+    try {
+      const row = db.prepare(`
+        SELECT * FROM security_state WHERE user_id = ?
+      `).get(userId);
+
+      resolve(row || null);
+    } catch (err) {
+      console.error('getSecurityState error:', err.message);
+      reject(err);
+    }
   });
 }
 
 function upsertSecurityState(userId, data) {
   return new Promise((resolve, reject) => {
-    db.run(
-      `INSERT INTO security_state (user_id, is_blocked, blocked_reason, risk_score, updated_at)
-       VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-       ON CONFLICT(user_id) DO UPDATE SET
-         is_blocked = excluded.is_blocked,
-         blocked_reason = excluded.blocked_reason,
-         risk_score = excluded.risk_score,
-         updated_at = CURRENT_TIMESTAMP`,
-      [
+    try {
+      db.prepare(`
+        INSERT INTO security_state (user_id, is_blocked, blocked_reason, risk_score, updated_at)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(user_id) DO UPDATE SET
+          is_blocked = excluded.is_blocked,
+          blocked_reason = excluded.blocked_reason,
+          risk_score = excluded.risk_score,
+          updated_at = CURRENT_TIMESTAMP
+      `).run(
         userId,
         data.is_blocked ? 1 : 0,
         data.blocked_reason || '',
         data.risk_score || 0
-      ],
-      function (err) {
-        if (err) {
-          console.error('upsertSecurityState error:', err.message);
-          return reject(err);
-        }
-        resolve();
-      }
-    );
+      );
+
+      resolve();
+    } catch (err) {
+      console.error('upsertSecurityState error:', err.message);
+      reject(err);
+    }
   });
 }
 
 function resetSecurityState(userId) {
   return new Promise((resolve, reject) => {
-    db.run(
-      `DELETE FROM security_state WHERE user_id = ?`,
-      [userId],
-      function (err) {
-        if (err) {
-          console.error('resetSecurityState error:', err.message);
-          return reject(err);
-        }
-        resolve();
-      }
-    );
+    try {
+      db.prepare(`
+        DELETE FROM security_state WHERE user_id = ?
+      `).run(userId);
+
+      resolve();
+    } catch (err) {
+      console.error('resetSecurityState error:', err.message);
+      reject(err);
+    }
   });
 }
 
 function getShopLockState(guildId) {
   return new Promise((resolve, reject) => {
-    db.get(
-      `SELECT * FROM shop_settings WHERE guild_id = ?`,
-      [guildId],
-      (err, row) => {
-        if (err) {
-          console.error('getShopLockState error:', err.message);
-          return reject(err);
-        }
-        resolve(row || { guild_id: guildId, shop_locked: 0, lock_reason: '' });
-      }
-    );
+    try {
+      const row = db.prepare(`
+        SELECT * FROM shop_settings WHERE guild_id = ?
+      `).get(guildId);
+
+      resolve(row || { guild_id: guildId, shop_locked: 0, lock_reason: '' });
+    } catch (err) {
+      console.error('getShopLockState error:', err.message);
+      reject(err);
+    }
   });
 }
 
 function setShopLockState(guildId, locked, reason = '') {
   return new Promise((resolve, reject) => {
-    db.run(
-      `INSERT INTO shop_settings (guild_id, shop_locked, lock_reason, updated_at)
-       VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-       ON CONFLICT(guild_id) DO UPDATE SET
-         shop_locked = excluded.shop_locked,
-         lock_reason = excluded.lock_reason,
-         updated_at = CURRENT_TIMESTAMP`,
-      [guildId, locked ? 1 : 0, reason],
-      function (err) {
-        if (err) {
-          console.error('setShopLockState error:', err.message);
-          return reject(err);
-        }
-        resolve();
-      }
-    );
+    try {
+      db.prepare(`
+        INSERT INTO shop_settings (guild_id, shop_locked, lock_reason, updated_at)
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(guild_id) DO UPDATE SET
+          shop_locked = excluded.shop_locked,
+          lock_reason = excluded.lock_reason,
+          updated_at = CURRENT_TIMESTAMP
+      `).run(guildId, locked ? 1 : 0, reason);
+
+      resolve();
+    } catch (err) {
+      console.error('setShopLockState error:', err.message);
+      reject(err);
+    }
   });
 }
 
-async function detectAbuse(userId, productRisk = 1) {
-  const rows = await getRecentLogs(userId, 60);
-  const buyCount = rows.filter(r => r.action === 'BUY_SUCCESS').length;
-  const failCount = rows.filter(r => r.action === 'BUY_FAIL').length;
-  const blockedCount = rows.filter(r => r.action === 'BUY_BLOCKED').length;
-  const highRiskCount = rows.filter(r => r.action === 'BUY_HIGH_RISK').length;
+function cleanupOldLogs() {
+  try {
+    db.prepare(`
+      DELETE FROM logs
+      WHERE action NOT IN ('SECURITY_FLAG', 'AUTO_KICK')
+      AND created_at < datetime('now', '-' || ? || ' days')
+    `).run(NORMAL_LOG_RETENTION_DAYS);
 
-  const normalizedRisk = Math.min(productRisk * 2, 6);
-  const riskScore =
-    (buyCount * 2) +
-    (failCount * 1) +
-    (blockedCount * 2) +
-    (highRiskCount * 3) +
-    normalizedRisk;
+    db.prepare(`
+      DELETE FROM logs
+      WHERE action IN ('SECURITY_FLAG', 'AUTO_KICK')
+      AND created_at < datetime('now', '-' || ? || ' days')
+    `).run(SECURITY_LOG_RETENTION_DAYS);
 
-  return {
-    suspicious: buyCount >= MAX_BUYS_PER_MINUTE || riskScore >= HIGH_RISK_THRESHOLD,
-    buyCount,
-    failCount,
-    blockedCount,
-    highRiskCount,
-    riskScore
-  };
+    console.log('🧹 Old logs cleaned');
+  } catch (err) {
+    console.error('cleanupOldLogs failed:', err.message);
+  }
 }
 
-function cleanupOldLogs() {
-  db.run(
-    `DELETE FROM logs
-     WHERE action NOT IN ('SECURITY_FLAG', 'AUTO_KICK')
-     AND created_at < datetime('now', '-' || ? || ' days')`,
-    [NORMAL_LOG_RETENTION_DAYS],
-    (err) => {
-      if (err) {
-        console.error('cleanup normal logs failed:', err.message);
-      }
-    }
-  );
+const purchaseProductAtomicTx = db.transaction((userId, productId) => {
+  const product = db.prepare(`
+    SELECT * FROM products
+    WHERE id = ? AND active = 1
+  `).get(productId);
 
-  db.run(
-    `DELETE FROM logs
-     WHERE action IN ('SECURITY_FLAG', 'AUTO_KICK')
-     AND created_at < datetime('now', '-' || ? || ' days')`,
-    [SECURITY_LOG_RETENTION_DAYS],
-    (err) => {
-      if (err) {
-        console.error('cleanup security logs failed:', err.message);
-      } else {
-        console.log('🧹 Old logs cleaned');
-      }
+  if (!product) {
+    return { ok: false, reason: 'PRODUCT_NOT_FOUND' };
+  }
+
+  const user = db.prepare(`
+    SELECT * FROM users WHERE user_id = ?
+  `).get(userId);
+
+  const points = user?.points || 0;
+  if (points < product.cost) {
+    return { ok: false, reason: 'NOT_ENOUGH_POINTS', product };
+  }
+
+  const code = db.prepare(`
+    SELECT * FROM codes
+    WHERE product_id = ? AND is_used = 0
+    ORDER BY id ASC
+    LIMIT 1
+  `).get(productId);
+
+  if (!code) {
+    return { ok: false, reason: 'OUT_OF_STOCK', product };
+  }
+
+  const useResult = db.prepare(`
+    UPDATE codes
+    SET is_used = 1
+    WHERE id = ? AND is_used = 0
+  `).run(code.id);
+
+  if (useResult.changes === 0) {
+    return { ok: false, reason: 'CODE_ALREADY_TAKEN', product };
+  }
+
+  const deductResult = db.prepare(`
+    UPDATE users
+    SET points = points - ?
+    WHERE user_id = ? AND points >= ?
+  `).run(product.cost, userId, product.cost);
+
+  if (deductResult.changes === 0) {
+    return { ok: false, reason: 'NOT_ENOUGH_POINTS', product };
+  }
+
+  return {
+    ok: true,
+    product,
+    code
+  };
+});
+
+function purchaseProductAtomic(userId, productId) {
+  return new Promise((resolve, reject) => {
+    try {
+      const result = purchaseProductAtomicTx(userId, productId);
+      resolve(result);
+    } catch (err) {
+      console.error('purchaseProductAtomic error:', err.message);
+      reject(err);
     }
-  );
+  });
 }
 
 async function findSecurityLogChannel(guild) {
@@ -955,130 +969,6 @@ async function validatePurchaseAccess(interaction, productId) {
     product,
     productRisk
   };
-}
-
-// ================= atomic purchase =================
-
-function purchaseProductAtomic(userId, productId) {
-  return new Promise((resolve, reject) => {
-    db.serialize(() => {
-      db.run('BEGIN IMMEDIATE TRANSACTION', (beginErr) => {
-        if (beginErr) {
-          console.error('BEGIN TRANSACTION error:', beginErr.message);
-          return reject(beginErr);
-        }
-
-        db.get(
-          `SELECT * FROM products WHERE id = ? AND active = 1`,
-          [productId],
-          (productErr, product) => {
-            if (productErr) {
-              return db.run('ROLLBACK', () => reject(productErr));
-            }
-
-            if (!product) {
-              return db.run('ROLLBACK', () => resolve({
-                ok: false,
-                reason: 'PRODUCT_NOT_FOUND'
-              }));
-            }
-
-            db.get(
-              `SELECT * FROM users WHERE user_id = ?`,
-              [userId],
-              (userErr, user) => {
-                if (userErr) {
-                  return db.run('ROLLBACK', () => reject(userErr));
-                }
-
-                const points = user?.points || 0;
-                if (points < product.cost) {
-                  return db.run('ROLLBACK', () => resolve({
-                    ok: false,
-                    reason: 'NOT_ENOUGH_POINTS',
-                    product
-                  }));
-                }
-
-                db.get(
-                  `SELECT * FROM codes
-                   WHERE product_id = ? AND is_used = 0
-                   ORDER BY id ASC
-                   LIMIT 1`,
-                  [productId],
-                  (codeErr, code) => {
-                    if (codeErr) {
-                      return db.run('ROLLBACK', () => reject(codeErr));
-                    }
-
-                    if (!code) {
-                      return db.run('ROLLBACK', () => resolve({
-                        ok: false,
-                        reason: 'OUT_OF_STOCK',
-                        product
-                      }));
-                    }
-
-                    db.run(
-                      `UPDATE codes
-                       SET is_used = 1
-                       WHERE id = ? AND is_used = 0`,
-                      [code.id],
-                      function (useErr) {
-                        if (useErr) {
-                          return db.run('ROLLBACK', () => reject(useErr));
-                        }
-
-                        if (this.changes === 0) {
-                          return db.run('ROLLBACK', () => resolve({
-                            ok: false,
-                            reason: 'CODE_ALREADY_TAKEN',
-                            product
-                          }));
-                        }
-
-                        db.run(
-                          `UPDATE users
-                           SET points = points - ?
-                           WHERE user_id = ? AND points >= ?`,
-                          [product.cost, userId, product.cost],
-                          function (deductErr) {
-                            if (deductErr) {
-                              return db.run('ROLLBACK', () => reject(deductErr));
-                            }
-
-                            if (this.changes === 0) {
-                              return db.run('ROLLBACK', () => resolve({
-                                ok: false,
-                                reason: 'NOT_ENOUGH_POINTS',
-                                product
-                              }));
-                            }
-
-                            db.run('COMMIT', (commitErr) => {
-                              if (commitErr) {
-                                return db.run('ROLLBACK', () => reject(commitErr));
-                              }
-
-                              resolve({
-                                ok: true,
-                                product,
-                                code,
-                              });
-                            });
-                          }
-                        );
-                      }
-                    );
-                  }
-                );
-              }
-            );
-          }
-        );
-      });
-    });
-  });
 }
 
 // ================= ui helpers =================
@@ -1361,21 +1251,21 @@ https://www.roblox.com/redeem
 `;
 
     await interaction.user.send({
-  content: message
-});
+      content: message
+    });
 
-await savePurchaseHistory(
-  userId,
-  product,
-  code.code_value,
-  'dm'
-);
+    await savePurchaseHistory(
+      userId,
+      product,
+      code.code_value,
+      'dm'
+    );
 
-await logAction(
-  userId,
-  'BUY_SUCCESS',
-  `product:${product.id} | code_id:${code.id} | risk:${access.productRisk}`
-);
+    await logAction(
+      userId,
+      'BUY_SUCCESS',
+      `product:${product.id} | code_id:${code.id} | risk:${access.productRisk}`
+    );
 
     const abuse = await detectAbuse(userId, access.productRisk);
     if (abuse.suspicious) {
@@ -1383,68 +1273,67 @@ await logAction(
     }
 
     const successPayload = {
-  content: `✅ Redemption successful! Product: **${product.name}**.\n\nYour redemption code has been sent to your DMs.\n\nThis message will close in 5 minutes.`,
-  ephemeral: true,
-  fetchReply: true
-};
+      content: `✅ Redemption successful! Product: **${product.name}**.\n\nYour redemption code has been sent to your DMs.\n\nThis message will close in 5 minutes.`,
+      ephemeral: true,
+      fetchReply: true
+    };
 
-let successMsg;
-if (interaction.deferred || interaction.replied) {
-  successMsg = await interaction.followUp(successPayload);
-} else {
-  successMsg = await interaction.reply(successPayload);
-}
+    let successMsg;
+    if (interaction.deferred || interaction.replied) {
+      successMsg = await interaction.followUp(successPayload);
+    } else {
+      successMsg = await interaction.reply(successPayload);
+    }
 
-setTimeout(async () => {
-  try {
-    await interaction.webhook.deleteMessage(successMsg.id);
-  } catch (err) {
-    console.error('purchase success delete error:', err.message);
-  }
-}, 5 * 60 * 1000);
+    setTimeout(async () => {
+      try {
+        await interaction.webhook.deleteMessage(successMsg.id);
+      } catch (err) {
+        console.error('purchase success delete error:', err.message);
+      }
+    }, 5 * 60 * 1000);
 
-return;
+    return;
   } catch (err) {
     console.error('DM send error:', err.message);
 
-    
     await savePurchaseHistory(
-  userId,
-  product,
-  code.code_value,
-  'ephemeral'
-);
+      userId,
+      product,
+      code.code_value,
+      'ephemeral'
+    );
 
- console.warn("User has DMs closed:", userId);
+    console.warn('User has DMs closed:', userId);
 
-await logAction(
-  userId,
-  'BUY_SUCCESS_DM_FAIL',
-  `product:${product.id} | code_id:${code.id}`
-);
+    await logAction(
+      userId,
+      'BUY_SUCCESS_DM_FAIL',
+      `product:${product.id} | code_id:${code.id}`
+    );
 
     const fallbackPayload = {
-  content: `✅ Redemption successful, but I couldn't send you a DM. Here is your code:\n\`${code.code_value}\`\n\nThis message will close in 5 minutes.`,
-  ephemeral: true,
-  fetchReply: true
-};
+      content: `✅ Redemption successful, but I couldn't send you a DM. Here is your code:\n\`${code.code_value}\`\n\nThis message will close in 5 minutes.`,
+      ephemeral: true,
+      fetchReply: true
+    };
 
-let fallbackMsg;
-if (interaction.deferred || interaction.replied) {
-  fallbackMsg = await interaction.followUp(fallbackPayload);
-} else {
-  fallbackMsg = await interaction.reply(fallbackPayload);
-}
+    let fallbackMsg;
+    if (interaction.deferred || interaction.replied) {
+      fallbackMsg = await interaction.followUp(fallbackPayload);
+    } else {
+      fallbackMsg = await interaction.reply(fallbackPayload);
+    }
 
-setTimeout(async () => {
-  try {
-    await interaction.webhook.deleteMessage(fallbackMsg.id);
-  } catch (err) {
-    console.error('purchase fallback delete error:', err.message);
-  }
-}, 5 * 60 * 1000);
+    setTimeout(async () => {
+      try {
+        await interaction.webhook.deleteMessage(fallbackMsg.id);
+      } catch (err) {
+        console.error('purchase fallback delete error:', err.message);
+      }
+    }, 5 * 60 * 1000);
 
-return;
+    return;
   }
 }
 
@@ -1577,15 +1466,12 @@ async function handleDeleteCode(interaction) {
 
   const codeId = interaction.options.getInteger('code_id');
 
-  await new Promise((resolve, reject) => {
-    db.run(`DELETE FROM codes WHERE id = ?`, [codeId], function (err) {
-      if (err) {
-        console.error('deleteCode error:', err.message);
-        return reject(err);
-      }
-      resolve();
-    });
-  });
+  try {
+    db.prepare(`DELETE FROM codes WHERE id = ?`).run(codeId);
+  } catch (err) {
+    console.error('deleteCode error:', err.message);
+    throw err;
+  }
 
   await logAction(
     interaction.user.id,
@@ -1969,28 +1855,26 @@ async function handleSecurityLogs(interaction, page = 1, forcedLimit = 10, filte
       .setDisabled(safePage >= totalPages)
   );
 
- if (interaction.isButton()) {
-  return interaction.update({
-    embeds: [embed],
-    components: [...buildSecurityPanelButtons(), navRow]
-  });
-}
+  if (interaction.isButton()) {
+    return interaction.update({
+      embeds: [embed],
+      components: [...buildSecurityPanelButtons(), navRow]
+    });
+  }
 
-// 👇 新增这个（处理 modal）
-if (interaction.isModalSubmit()) {
-  return interaction.reply({
+  if (interaction.isModalSubmit()) {
+    return interaction.reply({
+      embeds: [embed],
+      components: [...buildSecurityPanelButtons(), navRow],
+      ephemeral: true
+    });
+  }
+
+  return replySmart(interaction, {
     embeds: [embed],
     components: [...buildSecurityPanelButtons(), navRow],
     ephemeral: true
   });
-}
-
-// fallback（slash command）
-return replySmart(interaction, {
-  embeds: [embed],
-  components: [...buildSecurityPanelButtons(), navRow],
-  ephemeral: true
-});
 }
 
 async function handleSecurityStatus(interaction) {
@@ -2175,7 +2059,7 @@ async function handleSecurityReset(interaction, forcedUserId = null) {
   const reason = interaction.isChatInputCommand()
     ? (interaction.options.getString('reason') || 'No reason provided')
     : 'Triggered from security panel';
-  
+
   const targetUserId = forcedUserId || targetUser?.id;
 
   if (!targetUserId) {
@@ -2188,9 +2072,9 @@ async function handleSecurityReset(interaction, forcedUserId = null) {
   await resetSecurityState(targetUserId);
 
   await logAction(
-  interaction.user.id,
-  'ADMIN_SECURITY_RESET',
-  `target:${targetUserId} | reason:${reason}`
+    interaction.user.id,
+    'ADMIN_SECURITY_RESET',
+    `target:${targetUserId} | reason:${reason}`
   );
 
   return replySmart(interaction, {
@@ -2237,9 +2121,9 @@ client.once(Events.ClientReady, async (readyClient) => {
   cleanupOldLogs();
 
   for (const [, guild] of readyClient.guilds.cache) {
-  await updateServerStatsChannels(guild);
-}
-  
+    await updateServerStatsChannels(guild);
+  }
+
   const cleanupInterval = setInterval(cleanupOldLogs, 60 * 60 * 1000);
   cleanupInterval.unref();
 
@@ -2347,24 +2231,24 @@ client.on(Events.GuildMemberAdd, async (member) => {
 
     await saveInviteRecord(member.id, inviter.id);
 
-if (risk >= 5) {
-  await logAction(
-    inviter.id,
-    'INVITE_ABUSE_ALERT',
-    `invites:${total} new:${newRate.toFixed(2)} default:${defaultRate.toFixed(2)} risk:${risk}`
-  );
+    if (risk >= 5) {
+      await logAction(
+        inviter.id,
+        'INVITE_ABUSE_ALERT',
+        `invites:${total} new:${newRate.toFixed(2)} default:${defaultRate.toFixed(2)} risk:${risk}`
+      );
 
-  await logAction(
-    inviter.id,
-    'INVITE_REWARD_BLOCKED',
-    `invited:${member.id} | invites:${total} | newRate:${newRate.toFixed(2)} | defaultRate:${defaultRate.toFixed(2)} | risk:${risk}`
-  );
+      await logAction(
+        inviter.id,
+        'INVITE_REWARD_BLOCKED',
+        `invited:${member.id} | invites:${total} | newRate:${newRate.toFixed(2)} | defaultRate:${defaultRate.toFixed(2)} | risk:${risk}`
+      );
 
-  await notifySecurityAlert(
-    guild,
-    inviter,
-    'Invite Reward Blocked',
-    `An inviter was flagged as high-risk, so invite reward was blocked.
+      await notifySecurityAlert(
+        guild,
+        inviter,
+        'Invite Reward Blocked',
+        `An inviter was flagged as high-risk, so invite reward was blocked.
 
 Inviter: <@${inviter.id}>
 Tracked invites (1h): **${total}**
@@ -2372,10 +2256,10 @@ New account rate: **${newRate.toFixed(2)}**
 Default avatar rate: **${defaultRate.toFixed(2)}**
 Risk score: **${risk}**
 Action: **Invite reward blocked**`
-  );
+      );
 
-  return;
-}
+      return;
+    }
 
     const updatedUser = await addInvitePoint(inviter.id);
 
@@ -2462,8 +2346,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (commandName === 'securitylogs') {
         const limit = interaction.options.getInteger('limit') || 10;
         return handleSecurityLogs(interaction, 1, limit);
-      
       }
+
       if (commandName === 'securitystatus') return handleSecurityStatus(interaction);
       if (commandName === 'lockshop') return handleLockShop(interaction);
       if (commandName === 'unlockshop') return handleUnlockShop(interaction);
@@ -2549,149 +2433,149 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
 
       if (customId.startsWith('confirm_buy_')) {
-  const productId = Number(customId.split('_')[2]);
+        const productId = Number(customId.split('_')[2]);
 
-  await interaction.update({
-    content: 'Processing your purchase... This window will close in 2 seconds.',
-    embeds: [],
-    components: [],
-  });
+        await interaction.update({
+          content: 'Processing your purchase... This window will close in 2 seconds.',
+          embeds: [],
+          components: [],
+        });
 
-  setTimeout(async () => {
-    try {
-      await interaction.deleteReply();
-    } catch (err) {
-      console.error('confirm_buy deleteReply error:', err.message);
-    }
-  }, 3000);
+        setTimeout(async () => {
+          try {
+            await interaction.deleteReply();
+          } catch (err) {
+            console.error('confirm_buy deleteReply error:', err.message);
+          }
+        }, 3000);
 
-  return processPurchase(interaction, productId);
-}
+        return processPurchase(interaction, productId);
+      }
 
       if (customId.startsWith('cancel_buy_')) {
-  await interaction.update({
-    content: 'This redemption has been cancelled.',
-    embeds: [],
-    components: [],
-  });
+        await interaction.update({
+          content: 'This redemption has been cancelled.',
+          embeds: [],
+          components: [],
+        });
 
-  setTimeout(async () => {
-    try {
-      await interaction.deleteReply();
-    } catch (err) {
-      console.error('cancel_buy deleteReply error:', err.message);
-    }
-  }, 3000);
+        setTimeout(async () => {
+          try {
+            await interaction.deleteReply();
+          } catch (err) {
+            console.error('cancel_buy deleteReply error:', err.message);
+          }
+        }, 3000);
 
-  return;
-}
+        return;
+      }
 
       if (customId === 'sec_lockshop') {
-  return handleLockShop(interaction, 'Locked from security panel');
-}
+        return handleLockShop(interaction, 'Locked from security panel');
+      }
 
-if (customId === 'sec_unlockshop') {
-  return handleUnlockShop(interaction);
-}
+      if (customId === 'sec_unlockshop') {
+        return handleUnlockShop(interaction);
+      }
 
-if (customId === 'sec_status') {
-  return handleSecurityStatus(interaction);
-}
+      if (customId === 'sec_status') {
+        return handleSecurityStatus(interaction);
+      }
 
-if (customId === 'sec_filter_logs') {
-  const modal = new ModalBuilder()
-    .setCustomId('sec_filter_logs_modal')
-    .setTitle('Filter Security Logs');
+      if (customId === 'sec_filter_logs') {
+        const modal = new ModalBuilder()
+          .setCustomId('sec_filter_logs_modal')
+          .setTitle('Filter Security Logs');
 
-  const userInput = new TextInputBuilder()
-    .setCustomId('target_user')
-    .setLabel('User ID or Mention')
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder('Example: 123456789012345678 or <@123456789012345678>')
-    .setRequired(true);
+        const userInput = new TextInputBuilder()
+          .setCustomId('target_user')
+          .setLabel('User ID or Mention')
+          .setStyle(TextInputStyle.Short)
+          .setPlaceholder('Example: 123456789012345678 or <@123456789012345678>')
+          .setRequired(true);
 
-  modal.addComponents(
-    new ActionRowBuilder().addComponents(userInput)
-  );
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(userInput)
+        );
 
-  return interaction.showModal(modal);
-}
+        return interaction.showModal(modal);
+      }
 
-if (customId.startsWith('sec_logs_prev_')) {
-  const parts = customId.split('_');
-  const currentPage = Number(parts[3]);
-  const filteredUserId = parts[4] || null;
-  return handleSecurityLogs(interaction, currentPage - 1, 10, filteredUserId);
-}
+      if (customId.startsWith('sec_logs_prev_')) {
+        const parts = customId.split('_');
+        const currentPage = Number(parts[3]);
+        const filteredUserId = parts[4] || null;
+        return handleSecurityLogs(interaction, currentPage - 1, 10, filteredUserId);
+      }
 
-if (customId.startsWith('sec_logs_next_')) {
-  const parts = customId.split('_');
-  const currentPage = Number(parts[3]);
-  const filteredUserId = parts[4] || null;
-  return handleSecurityLogs(interaction, currentPage + 1, 10, filteredUserId);
-}
+      if (customId.startsWith('sec_logs_next_')) {
+        const parts = customId.split('_');
+        const currentPage = Number(parts[3]);
+        const filteredUserId = parts[4] || null;
+        return handleSecurityLogs(interaction, currentPage + 1, 10, filteredUserId);
+      }
 
-if (customId.startsWith('sec_reset_')) {
-  const userId = customId.replace('sec_reset_', '');
-  return handleSecurityReset(interaction, userId);
-}
+      if (customId.startsWith('sec_reset_')) {
+        const userId = customId.replace('sec_reset_', '');
+        return handleSecurityReset(interaction, userId);
+      }
     }
 
     if (interaction.isModalSubmit()) {
-        if (interaction.customId === 'sec_filter_logs_modal') {
-    const rawInput = interaction.fields.getTextInputValue('target_user').trim();
-    const match = rawInput.match(/\d{17,20}/);
-    const targetUserId = match ? match[0] : null;
+      if (interaction.customId === 'sec_filter_logs_modal') {
+        const rawInput = interaction.fields.getTextInputValue('target_user').trim();
+        const match = rawInput.match(/\d{17,20}/);
+        const targetUserId = match ? match[0] : null;
 
-    if (!targetUserId) {
-      return interaction.reply({
-        content: 'Invalid input. Please enter a valid user ID or mention.',
-        ephemeral: true
-      });
+        if (!targetUserId) {
+          return interaction.reply({
+            content: 'Invalid input. Please enter a valid user ID or mention.',
+            ephemeral: true
+          });
+        }
+
+        return handleSecurityLogs(interaction, 1, 10, targetUserId);
+      }
+
+      if (interaction.customId === 'partner_modal') {
+        const gameLink = interaction.fields.getTextInputValue('game_link').trim();
+        const profileLink = interaction.fields.getTextInputValue('profile_link').trim();
+        const noteRaw = interaction.fields.getTextInputValue('note');
+        const note = noteRaw?.trim() || 'Come join and have fun!';
+
+        const embed = buildPartnerEmbed({
+          user: interaction.user,
+          gameLink,
+          profileLink,
+          note
+        });
+
+        if (!interaction.channel) {
+          return interaction.reply({
+            content: '❌ I could not find the channel to post your invite.',
+            ephemeral: true
+          });
+        }
+
+        try {
+          await interaction.channel.send({
+            embeds: [embed]
+          });
+
+          return interaction.reply({
+            content: '✅ Your invite has been posted.',
+            ephemeral: true
+          });
+        } catch (err) {
+          console.error('partner_modal send error:', err);
+
+          return interaction.reply({
+            content: '❌ Failed to post your invite message in this channel.',
+            ephemeral: true
+          });
+        }
+      }
     }
-
-    return handleSecurityLogs(interaction, 1, 10, targetUserId);
-  }
-  
-  if (interaction.customId === 'partner_modal') {
-  const gameLink = interaction.fields.getTextInputValue('game_link').trim();
-  const profileLink = interaction.fields.getTextInputValue('profile_link').trim();
-  const noteRaw = interaction.fields.getTextInputValue('note');
-  const note = noteRaw?.trim() || 'Come join and have fun!';
-
-  const embed = buildPartnerEmbed({
-    user: interaction.user,
-    gameLink,
-    profileLink,
-    note
-  });
-
-  if (!interaction.channel) {
-    return interaction.reply({
-      content: '❌ I could not find the channel to post your invite.',
-      ephemeral: true
-    });
-  }
-
-  try {
-    await interaction.channel.send({
-      embeds: [embed]
-    });
-
-    return interaction.reply({
-      content: '✅ Your invite has been posted.',
-      ephemeral: true
-    });
-  } catch (err) {
-    console.error('partner_modal send error:', err);
-
-    return interaction.reply({
-      content: '❌ Failed to post your invite message in this channel.',
-      ephemeral: true
-    });
-  }
-}
-}
   } catch (err) {
     console.error('Interaction error:', err);
 
