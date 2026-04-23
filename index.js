@@ -2266,6 +2266,9 @@ Action: **Invite reward blocked**`
 
     await logAction(inviter.id, 'INVITE_REWARD', `invited:${member.id}`);
 
+    console.log('WELCOME_CHANNEL_ID =', WELCOME_CHANNEL_ID);
+    console.log('guild.systemChannel =', guild.systemChannel?.name);
+
     const welcomeChannel =
       (WELCOME_CHANNEL_ID
         ? guild.channels.cache.get(WELCOME_CHANNEL_ID) ||
