@@ -34,6 +34,7 @@ const BUY_COOLDOWN_MS = Number(process.env.BUY_COOLDOWN_MS || 4000);
 const MAX_BUYS_PER_MINUTE = Number(process.env.MAX_BUYS_PER_MINUTE || 3);
 const AUTO_KICK_ON_ABUSE = String(process.env.AUTO_KICK_ON_ABUSE || 'false') === 'true';
 const SECURITY_LOG_CHANNEL_ID = process.env.SECURITY_LOG_CHANNEL_ID || '';
+const WELCOME_CHANNEL_ID = process.env.WELCOME_CHANNEL_ID || '';
 const NORMAL_LOG_RETENTION_DAYS = Number(process.env.NORMAL_LOG_RETENTION_DAYS || 7);
 const SECURITY_LOG_RETENTION_DAYS = Number(process.env.SECURITY_LOG_RETENTION_DAYS || 30);
 const NEW_MEMBER_PROTECTION_MINUTES = Number(process.env.NEW_MEMBER_PROTECTION_MINUTES || 10);
@@ -765,7 +766,7 @@ async function findSecurityLogChannel(guild) {
     const channel = guild.channels.cache.find(
       ch => ch.isTextBased?.() && ch.name === name
     );
-    if (channel) return channel;
+    if (welcomeChannel) { return channel;
   }
 
   return null;
@@ -2265,26 +2266,40 @@ Action: **Invite reward blocked**`
 
     await logAction(inviter.id, 'INVITE_REWARD', `invited:${member.id}`);
 
-    const channel = guild.systemChannel;
+  const welcomeChannel =
+  (WELCOME_CHANNEL_ID
+    ? guild.channels.cache.get(WELCOME_CHANNEL_ID) ||
+      await guild.channels.fetch(WELCOME_CHANNEL_ID).catch(() => null)
+    : null) ||
+  guild.systemChannel ||
+  guild.channels.cache.find(
+    ch => ch.isTextBased?.() && ch.name === 'welcome'
+  ) ||
+  guild.channels.cache.find(
+    ch => ch.isTextBased?.() && ch.name === 'general'
+  );
 
-    if (channel) {
-      const embed = new EmbedBuilder()
-        .setTitle('🎉 New Player Joined')
-        .setColor(0x00FFAA)
-        .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
-        .setDescription(
-          `✨ **${member.user.username} joined the server!**\n\n` +
-          `👤 Invited by <@${inviter.id}>\n` +
-          `📊 Invites: **${updatedUser.invite_count}**`
-        )
-        .setFooter({ text: 'Invite System' });
+if (welcomeChannel) {
+  const embed = new EmbedBuilder()
+    .setColor(0xF1C40F)
+    .setTitle(`Welcome to ${guild.name}!`)
+    .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
+    .setDescription(
+      `Hey ${member}, welcome to **${guild.name}** 🎉\n` +
+      `Have fun and don't rage quit 😆\n\n` +
+      `👤 **Invited by:** <@${inviter.id}>\n` +
+      `📈 **Their total invites:** ${updatedUser.invite_count}\n` +
+      `🆔 **Member #${guild.memberCount}**`
+    )
+    .setImage('https://i.imgur.com/iu6UwVJ.png')
+    .setFooter({ text: `${member.user.username} just joined the server` })
+    .setTimestamp();
 
-      const msg = await channel.send({ embeds: [embed] });
-
-      setTimeout(() => {
-        msg.delete().catch(() => {});
-      }, 5000);
-    }
+  await welcomeChannel.send({
+    content: `Hey ${member}, welcome to **${guild.name}**!`,
+    embeds: [embed]
+  });
+}
 
     try {
       await inviter.send(
