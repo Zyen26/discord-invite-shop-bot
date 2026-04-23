@@ -2266,40 +2266,40 @@ Action: **Invite reward blocked**`
 
     await logAction(inviter.id, 'INVITE_REWARD', `invited:${member.id}`);
 
-  const welcomeChannel =
-  (WELCOME_CHANNEL_ID
-    ? guild.channels.cache.get(WELCOME_CHANNEL_ID) ||
-      await guild.channels.fetch(WELCOME_CHANNEL_ID).catch(() => null)
-    : null) ||
-  guild.systemChannel ||
-  guild.channels.cache.find(
-    ch => ch.isTextBased?.() && ch.name === 'welcome'
-  ) ||
-  guild.channels.cache.find(
-    ch => ch.isTextBased?.() && ch.name === 'general'
-  );
+    const welcomeChannel =
+      (WELCOME_CHANNEL_ID
+        ? guild.channels.cache.get(WELCOME_CHANNEL_ID) ||
+          await guild.channels.fetch(WELCOME_CHANNEL_ID).catch(() => null)
+        : null) ||
+      guild.systemChannel ||
+      guild.channels.cache.find(
+        ch => ch.isTextBased?.() && ch.name === 'welcome'
+      ) ||
+      guild.channels.cache.find(
+        ch => ch.isTextBased?.() && ch.name === 'general'
+      );
 
-if (welcomeChannel) {
-  const embed = new EmbedBuilder()
-    .setColor(0xF1C40F)
-    .setTitle(`Welcome to ${guild.name}!`)
-    .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
-    .setDescription(
-      `Hey ${member}, welcome to **${guild.name}** 🎉\n` +
-      `Have fun and don't rage quit 😆\n\n` +
-      `👤 **Invited by:** <@${inviter.id}>\n` +
-      `📈 **Their total invites:** ${updatedUser.invite_count}\n` +
-      `🆔 **Member #${guild.memberCount}**`
-    )
-    .setImage('https://i.imgur.com/iu6UwVJ.png')
-    .setFooter({ text: `${member.user.username} just joined the server` })
-    .setTimestamp();
+    if (welcomeChannel) {
+      const embed = new EmbedBuilder()
+        .setColor(0xF1C40F)
+        .setTitle(`Welcome to ${guild.name}!`)
+        .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
+        .setDescription(
+          `Hey ${member}, welcome to **${guild.name}** 🎉\n` +
+          `Have fun and don't rage quit 😆\n\n` +
+          `👤 **Invited by:** <@${inviter.id}>\n` +
+          `📈 **Their total invites:** ${updatedUser.invite_count}\n` +
+          `🆔 **Member #${guild.memberCount}**`
+        )
+        .setImage('https://i.imgur.com/iu6UwVJ.png')
+        .setFooter({ text: `${member.user.username} just joined the server` })
+        .setTimestamp();
 
-  await welcomeChannel.send({
-    content: `Hey ${member}, welcome to **${guild.name}**!`,
-    embeds: [embed]
-  });
-}
+      await welcomeChannel.send({
+        content: `Hey ${member}, welcome to **${guild.name}**!`,
+        embeds: [embed]
+      });
+    }
 
     try {
       await inviter.send(
