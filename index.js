@@ -766,7 +766,7 @@ async function findSecurityLogChannel(guild) {
     const channel = guild.channels.cache.find(
       ch => ch.isTextBased?.() && ch.name === name
     );
-    if (welcomeChannel) { return channel;
+    if (channel) return channel;
   }
 
   return null;
@@ -2296,18 +2296,18 @@ Action: **Invite reward blocked**`
         .setTimestamp();
 
       await welcomeChannel.send({
-        content: `Hey ${member}, welcome to **${guild.name}**!`,
-        embeds: [embed]
+      content: `Hey ${member}, welcome to **${guild.name}**!`,
+      embeds: [embed]
       });
     }
 
     try {
-      await inviter.send(
-        `🎉 You successfully invited **${member.user.tag}** to join **${guild.name}**!\nYou earned **1 point**.\nCurrent points: **${updatedUser.points}**\nTotal invites: **${updatedUser.invite_count}**`
-      );
-    } catch (dmErr) {
-      console.error(`Failed to DM inviter ${inviter.tag}:`, dmErr.message);
-    }
+  await inviter.send(
+    `🎉 You successfully invited **${member.user.tag}** to join **${guild.name}**!\nYou earned **1 point**.\nCurrent points: **${updatedUser.points}**\nTotal invites: **${updatedUser.invite_count}**`
+  );
+} catch (dmErr) {
+  console.error(`Failed to DM inviter ${inviter.tag}:`, dmErr.message);
+}
   } catch (err) {
     console.error('GuildMemberAdd invite tracking error:', err);
   }
