@@ -2207,7 +2207,7 @@ client.on(Events.GuildMemberAdd, async (member) => {
     if (!inviter) return;
 
     const existing = await hasInviteRecord(member.id);
-    if (existing) return;
+    // if (existing) return;
 
     const accountAgeDays =
       (Date.now() - member.user.createdTimestamp) / (1000 * 60 * 60 * 24);
