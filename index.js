@@ -2332,17 +2332,30 @@ if (welcomeChannel) {
   `&avatar=${encodeURIComponent(member.user.displayAvatarURL({ extension: 'png', size: 256 }))}`;
 
   await welcomeChannel.send({
-    content:
-      `Hey ${member}, welcome to **${guild.name}**! 🎉\n\n` +
+  content: `Hey ${member}, welcome to **${guild.name}**! 🎉`,
+
+  embeds: [
+  {
+    color: 0xFFD700,
+
+    author: {
+      name: `Welcome to ${guild.name}!`,
+      icon_url: member.user.displayAvatarURL()
+    },
+
+    description:
       `👤 **Invited by:** <@${inviter.id}>\n` +
       `📈 **Their total invites:** ${updatedUser.invite_count}\n` +
       `${isRepeatJoin ? '⚠️ **Repeat join:** no points added\n' : ''}`,
-    embeds: [
-      {
-        image: { url: imageUrl }
-      }
-    ]
-  });
+
+    image: {
+      url: imageUrl
+    },
+
+    timestamp: new Date()
+  }
+]
+});
 }
 
 try {
