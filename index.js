@@ -352,6 +352,44 @@ function saveInviteRecord(invitedUserId, inviterId) {
   });
 }
 
+async function getOrCreateUser(userId) {
+  return new Promise((resolve, reject) => {
+    db.get(
+      `SELECT * FROM users WHERE user_id = ?`,
+      [userId],
+      (err, row) => {
+        if (err) {
+          console.error('getOrCreateUser error:', err.message);
+          return reject(err);
+        }
+
+        if (row) {
+          return resolve(row);
+        }
+
+        // 如果用户不存在就创建
+        db.run(
+          `INSERT INTO users (user_id, points, invite_count)
+           VALUES (?, 0, 0)`,
+          [userId],
+          function (insertErr) {
+            if (insertErr) {
+              console.error('create user error:', insertErr.message);
+              return reject(insertErr);
+            }
+
+            resolve({
+              user_id: userId,
+              points: 0,
+              invite_count: 0
+            });
+          }
+        );
+      }
+    );
+  });
+}
+
 function seedProducts() {
   try {
     db.prepare(`
@@ -2207,7 +2245,7 @@ client.on(Events.GuildMemberAdd, async (member) => {
     if (!inviter) return;
 
     const existing = await hasInviteRecord(member.id);
-    // if (existing) return;
+    const isRepeatJoin = !!existing;
 
     const accountAgeDays =
       (Date.now() - member.user.createdTimestamp) / (1000 * 60 * 60 * 24);
@@ -2230,26 +2268,30 @@ client.on(Events.GuildMemberAdd, async (member) => {
     if (newRate > 0.6) risk += 3;
     if (defaultRate > 0.5) risk += 2;
 
-    await saveInviteRecord(member.id, inviter.id);
+    let updatedUser;
 
-    if (risk >= 5) {
-      await logAction(
-        inviter.id,
-        'INVITE_ABUSE_ALERT',
-        `invites:${total} new:${newRate.toFixed(2)} default:${defaultRate.toFixed(2)} risk:${risk}`
-      );
+if (!isRepeatJoin) {
+  await saveInviteRecord(member.id, inviter.id);
+}
 
-      await logAction(
-        inviter.id,
-        'INVITE_REWARD_BLOCKED',
-        `invited:${member.id} | invites:${total} | newRate:${newRate.toFixed(2)} | defaultRate:${defaultRate.toFixed(2)} | risk:${risk}`
-      );
+if (risk >= 5) {
+  await logAction(
+    inviter.id,
+    'INVITE_ABUSE_ALERT',
+    `invites:${total} new:${newRate.toFixed(2)} default:${defaultRate.toFixed(2)} risk:${risk}`
+  );
 
-      await notifySecurityAlert(
-        guild,
-        inviter,
-        'Invite Reward Blocked',
-        `An inviter was flagged as high-risk, so invite reward was blocked.
+  await logAction(
+    inviter.id,
+    'INVITE_REWARD_BLOCKED',
+    `invited:${member.id} | invites:${total} | newRate:${newRate.toFixed(2)} | defaultRate:${defaultRate.toFixed(2)} | risk:${risk}`
+  );
+
+  await notifySecurityAlert(
+    guild,
+    inviter,
+    'Invite Reward Blocked',
+    `An inviter was flagged as high-risk, so invite reward was blocked.
 
 Inviter: <@${inviter.id}>
 Tracked invites (1h): **${total}**
@@ -2257,12 +2299,16 @@ New account rate: **${newRate.toFixed(2)}**
 Default avatar rate: **${defaultRate.toFixed(2)}**
 Risk score: **${risk}**
 Action: **Invite reward blocked**`
-      );
+  );
 
-      return;
-    }
+  return;
+}
 
-    const updatedUser = await addInvitePoint(inviter.id);
+if (isRepeatJoin) {
+  updatedUser = await getOrCreateUser(inviter.id);
+} else {
+  updatedUser = await addInvitePoint(inviter.id);
+}
 
     await logAction(inviter.id, 'INVITE_REWARD', `invited:${member.id}`);
 
@@ -2292,6 +2338,7 @@ Action: **Invite reward blocked**`
           `Have fun and don't rage quit 😆\n\n` +
           `👤 **Invited by:** <@${inviter.id}>\n` +
           `📈 **Their total invites:** ${updatedUser.invite_count}\n` +
+          `${isRepeatJoin ? '⚠️ **Repeat join:** no points added\n' : ''}` +
           `🆔 **Member #${guild.memberCount}**`
         )
         .setImage('https://i.imgur.com/iu6UwVJ.png')
