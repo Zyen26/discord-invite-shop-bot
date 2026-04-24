@@ -2334,18 +2334,17 @@ if (welcomeChannel) {
   await welcomeChannel.send({
   embeds: [
     {
-      color: 0xFFD700, // 金色边框
-
-      author: {
-      name: `Welcome to ${guild.name}! 🎉`,
-      icon_url: member.user.displayAvatarURL({ size: 256 })
-      },
+      color: 0xFFD700,
 
       description:
-      `Hey ${member}, welcome to **${guild.name}**! 🎉\n\n` +
-      `👤 **Invited by:** <@${inviter.id}>\n` +
-      `📈 **Their total invites:** ${updatedUser.invite_count}\n` +
-      `${isRepeatJoin ? '⚠️ **Repeat join:** no points added\n' : ''}`,
+        `Hey ${member}, welcome to **${guild.name}**! 🎉\n\n` +
+        `👤 **Invited by:** <@${inviter.id}>\n` +
+        `📈 **Their total invites:** ${updatedUser.invite_count}\n` +
+        `${isRepeatJoin ? '⚠️ **Repeat join:** no points added\n' : ''}`,
+
+      thumbnail: {
+        url: member.user.displayAvatarURL({ size: 256 })
+      },
 
       image: {
         url: imageUrl
