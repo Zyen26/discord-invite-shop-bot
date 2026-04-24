@@ -2324,26 +2324,22 @@ if (isRepeatJoin) {
       );
 
     if (welcomeChannel) {
-  const embed = new EmbedBuilder()
-    .setColor(0xF1C40F)
-    .setTitle(`Welcome to ${guild.name}!`)
-    .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
-    .setDescription(
-      `Hey ${member}, welcome to **${guild.name}** 🎉\n` +
-      `Have fun and don't rage quit 😆\n\n` +
-      `👤 **Invited by:** <@${inviter.id}>\n` +
-      `📈 **Their total invites:** ${updatedUser.invite_count}\n` +
-      `${isRepeatJoin ? '⚠️ **Repeat join:** no points added\n' : ''}` +
-      `🆔 **Member #${guild.memberCount}**`
-    )
-    .setImage(member.user.displayAvatarURL({ size: 512 }))
-    .setFooter({ text: `${member.user.username} just joined the server` })
-    .setTimestamp();
+  const imageUrl = `https://api.popcat.xyz/welcomecard?background=https://i.imgur.com/iu6UwVJ.png&text1=${encodeURIComponent(member.user.username)}&text2=Welcome&text3=Member%20%23${guild.memberCount}&avatar=${member.user.displayAvatarURL({ extension: 'png' })}`;
 
-  await welcomeChannel.send({
-    embeds: [embed]
-  });
-}
+const embed = new EmbedBuilder()
+  .setColor(0xF1C40F)
+  .setTitle(`Welcome to ${guild.name}!`)
+  .setDescription(
+    `👤 **Invited by:** <@${inviter.id}>\n` +
+    `📈 **Their total invites:** ${updatedUser.invite_count}\n` +
+    `${isRepeatJoin ? '⚠️ **Repeat join:** no points added\n' : ''}`
+  )
+  .setImage(imageUrl) // 👈 只保留这个
+  .setTimestamp();
+
+await welcomeChannel.send({
+  embeds: [embed]
+});
 
     try {
   await inviter.send(
