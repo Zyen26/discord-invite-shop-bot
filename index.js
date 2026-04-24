@@ -2324,8 +2324,7 @@ if (isRepeatJoin) {
       );
 
     if (welcomeChannel) {
-  const imageUrl = `https://api.popcat.xyz/welcomecard?background=https://i.imgur.com/8b1QZtQ.png&text1=${encodeURIComponent(member.user.username)}&text2=Welcome%20to%20${encodeURIComponent(guild.name)}&text3=Member%20%23${guild.memberCount}&avatar=${encodeURIComponent(member.user.displayAvatarURL({ extension: 'png' }))}`;
-
+const imageUrl = `https://api.popcat.xyz/welcomecard?text1=${encodeURIComponent(member.user.username)}&text2=Welcome%20to%20${encodeURIComponent(guild.name)}&text3=Member%20%23${guild.memberCount}&avatar=${encodeURIComponent(member.user.displayAvatarURL({ extension: 'png' }))}`;
   await welcomeChannel.send({
     content:
       `Hey ${member}, welcome to **${guild.name}**! 🎉\n\n` +
@@ -2334,7 +2333,7 @@ if (isRepeatJoin) {
       `${isRepeatJoin ? '⚠️ **Repeat join:** no points added\n' : ''}`,
     files: [imageUrl]
   });
-}
+} 
 
 try {
   await inviter.send(
