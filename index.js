@@ -852,7 +852,7 @@ async function notifySecurityAlert(guild, user, title, description) {
       .setTimestamp();
 
     if (user) {
-      embed.setThumbnail(user.displayAvatarURL({ size: 256 }));
+      embed.setThumbnail(member.user.displayAvatarURL({ size: 256 }))
       embed.addFields(
         { name: 'User', value: `${user.tag}`, inline: true },
         { name: 'User ID', value: `${user.id}`, inline: true }
@@ -2324,27 +2324,26 @@ if (isRepeatJoin) {
       );
 
     if (welcomeChannel) {
-      const embed = new EmbedBuilder()
-        .setColor(0xF1C40F)
-        .setTitle(`Welcome to ${guild.name}!`)
-        .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
-        .setDescription(
-          `Hey ${member}, welcome to **${guild.name}** 🎉\n` +
-          `Have fun and don't rage quit 😆\n\n` +
-          `👤 **Invited by:** <@${inviter.id}>\n` +
-          `📈 **Their total invites:** ${updatedUser.invite_count}\n` +
-          `${isRepeatJoin ? '⚠️ **Repeat join:** no points added\n' : ''}` +
-          `🆔 **Member #${guild.memberCount}**`
-        )
-        .setImage('https://i.imgur.com/iu6UwVJ.png')
-        .setFooter({ text: `${member.user.username} just joined the server` })
-        .setTimestamp();
+  const embed = new EmbedBuilder()
+    .setColor(0xF1C40F)
+    .setTitle(`Welcome to ${guild.name}!`)
+    .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
+    .setDescription(
+      `Hey ${member}, welcome to **${guild.name}** 🎉\n` +
+      `Have fun and don't rage quit 😆\n\n` +
+      `👤 **Invited by:** <@${inviter.id}>\n` +
+      `📈 **Their total invites:** ${updatedUser.invite_count}\n` +
+      `${isRepeatJoin ? '⚠️ **Repeat join:** no points added\n' : ''}` +
+      `🆔 **Member #${guild.memberCount}**`
+    )
+    .setImage(member.user.displayAvatarURL({ size: 512 }))
+    .setFooter({ text: `${member.user.username} just joined the server` })
+    .setTimestamp();
 
-      await welcomeChannel.send({
-      content: `Hey ${member}, welcome to **${guild.name}**!`,
-      embeds: [embed]
-      });
-    }
+  await welcomeChannel.send({
+    embeds: [embed]
+  });
+}
 
     try {
   await inviter.send(
