@@ -2324,12 +2324,19 @@ if (isRepeatJoin) {
       );
 
     if (welcomeChannel) {
+  const imageUrl = `https://api.popcat.xyz/welcomecard?background=https://i.imgur.com/kNP12kv.png&text1=${encodeURIComponent(member.user.username)}&text2=Welcome%20to%20${encodeURIComponent(guild.name)}&text3=Member%20%23${guild.memberCount}&avatar=${encodeURIComponent(member.user.displayAvatarURL({ extension: 'png' }))}`;
+  
   await welcomeChannel.send({
-    content:
-      `Hey ${member}, welcome to **${guild.name}**! 🎉\n\n` +
-      `👤 **Invited by:** <@${inviter.id}>\n` +
-      `📈 **Their total invites:** ${updatedUser.invite_count}\n` +
-      `${isRepeatJoin ? '⚠️ **Repeat join:** no points added\n' : ''}`
+  content:
+    `Hey ${member}, welcome to **${guild.name}**! 🎉\n\n` +
+    `👤 **Invited by:** <@${inviter.id}>\n` +
+    `📈 **Their total invites:** ${updatedUser.invite_count}\n` +
+    `${isRepeatJoin ? '⚠️ **Repeat join:** no points added\n' : ''}`,
+    embeds: [
+      {
+        image: { url: imageUrl }
+      }
+    ]
   });
 }
 
