@@ -2311,27 +2311,37 @@ if (isRepeatJoin) {
     console.log('guild.systemChannel =', guild.systemChannel?.name);
 
     const welcomeChannel =
-      (WELCOME_CHANNEL_ID
-        ? guild.channels.cache.get(WELCOME_CHANNEL_ID) ||
-          await guild.channels.fetch(WELCOME_CHANNEL_ID).catch(() => null)
-        : null) ||
-      guild.systemChannel ||
-      guild.channels.cache.find(
-        ch => ch.isTextBased?.() && ch.name === 'welcome'
-      ) ||
-      guild.channels.cache.find(
-        ch => ch.isTextBased?.() && ch.name === 'general'
-      );
+  (WELCOME_CHANNEL_ID
+    ? guild.channels.cache.get(WELCOME_CHANNEL_ID) ||
+      await guild.channels.fetch(WELCOME_CHANNEL_ID).catch(() => null)
+    : null) ||
+  guild.systemChannel ||
+  guild.channels.cache.find(
+    ch => ch.isTextBased?.() && ch.name === 'welcome'
+  ) ||
+  guild.channels.cache.find(
+    ch => ch.isTextBased?.() && ch.name === 'general'
+  );
 
-    if (welcomeChannel) {
-  const imageUrl = `https://api.popcat.xyz/welcomecard?background=https://i.imgur.com/kNP12kv.png&text1=${encodeURIComponent(member.user.username)}&text2=Welcome%20to%20${encodeURIComponent(guild.name)}&text3=Member%20%23${guild.memberCount}&avatar=${encodeURIComponent(member.user.displayAvatarURL({ extension: 'png' }))}`;
-  
+if (welcomeChannel) {
+  const imageUrl = `https://api.popcat.xyz/welcomecard?` +
+    `background=https://i.imgur.com/kNP12kv.png` +
+    `&border_color=gold` +
+    `&border_radius=20` +
+    `&padding=20` +
+    `&width=950` +
+    `&avatar_border=true` +
+    `&avatar_border_color=gold` +
+    `&text1=${encodeURIComponent(member.user.username)}` +
+    `&text2=Welcome%20to%20${encodeURIComponent(guild.name)}` +
+    `&text3=Member%20%23${guild.memberCount}`;
+
   await welcomeChannel.send({
-  content:
-    `Hey ${member}, welcome to **${guild.name}**! 🎉\n\n` +
-    `👤 **Invited by:** <@${inviter.id}>\n` +
-    `📈 **Their total invites:** ${updatedUser.invite_count}\n` +
-    `${isRepeatJoin ? '⚠️ **Repeat join:** no points added\n' : ''}`,
+    content:
+      `Hey ${member}, welcome to **${guild.name}**! 🎉\n\n` +
+      `👤 **Invited by:** <@${inviter.id}>\n` +
+      `📈 **Their total invites:** ${updatedUser.invite_count}\n` +
+      `${isRepeatJoin ? '⚠️ **Repeat join:** no points added\n' : ''}`,
     embeds: [
       {
         image: { url: imageUrl }
