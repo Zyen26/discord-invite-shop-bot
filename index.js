@@ -2337,10 +2337,10 @@ if (welcomeChannel) {
       color: 0xFFD700,
 
       description:
-        `Hey ${member}, welcome to **${guild.name}**! 🎉\n\n` +
-        `👤 **Invited by:** <@${inviter.id}>\n` +
-        `📈 **Their total invites:** ${updatedUser.invite_count}\n` +
-        `${isRepeatJoin ? '⚠️ **Repeat join:** no points added\n' : ''}`,
+        `**Hey ${member}, welcome to ${guild.name}!** 🎉\n\n` +
+        `👤 Invited by: <@${inviter.id}>\n` +
+        `📈 Their total invites: ${updatedUser.invite_count}\n` +
+        `${isRepeatJoin ? '⚠️ Repeat join: no points added\n' : ''}`,
 
       thumbnail: {
         url: member.user.displayAvatarURL({ size: 256 })
