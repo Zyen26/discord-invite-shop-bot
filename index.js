@@ -2324,22 +2324,16 @@ if (isRepeatJoin) {
       );
 
     if (welcomeChannel) {
-  const imageUrl = `https://api.popcat.xyz/welcomecard?background=https://i.imgur.com/iu6UwVJ.png&text1=${encodeURIComponent(member.user.username)}&text2=Welcome&text3=Member%20%23${guild.memberCount}&avatar=${encodeURIComponent(member.user.displayAvatarURL({ extension: 'png' }))}`;
+  const imageUrl = `https://api.popcat.xyz/welcomecard?background=https://i.imgur.com/8b1QZtQ.png&text1=${encodeURIComponent(member.user.username)}&text2=Welcome%20to%20${encodeURIComponent(guild.name)}&text3=Member%20%23${guild.memberCount}&avatar=${encodeURIComponent(member.user.displayAvatarURL({ extension: 'png' }))}`;
 
-const embed = new EmbedBuilder()
-  .setColor(0xF1C40F)
-  .setTitle(`Welcome to ${guild.name}!`)
-  .setDescription(
-    `👤 **Invited by:** <@${inviter.id}>\n` +
-    `📈 **Their total invites:** ${updatedUser.invite_count}\n` +
-    `${isRepeatJoin ? '⚠️ **Repeat join:** no points added\n' : ''}`
-  )
-  .setImage(imageUrl)
-  .setTimestamp();
-
-await welcomeChannel.send({
-  embeds: [embed]
-});
+  await welcomeChannel.send({
+    content:
+      `Hey ${member}, welcome to **${guild.name}**! 🎉\n\n` +
+      `👤 **Invited by:** <@${inviter.id}>\n` +
+      `📈 **Their total invites:** ${updatedUser.invite_count}\n` +
+      `${isRepeatJoin ? '⚠️ **Repeat join:** no points added\n' : ''}`,
+    files: [imageUrl]
+  });
 }
 
 try {
