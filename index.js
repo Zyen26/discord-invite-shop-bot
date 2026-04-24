@@ -2325,16 +2325,11 @@ if (isRepeatJoin) {
 
 if (welcomeChannel) {
   const imageUrl = `https://api.popcat.xyz/welcomecard?` +
-    `background=https://i.imgur.com/kNP12kv.png` +
-    `&border_color=gold` +
-    `&border_radius=20` +
-    `&padding=20` +
-    `&width=950` +
-    `&avatar_border=true` +
-    `&avatar_border_color=gold` +
-    `&text1=${encodeURIComponent(member.user.username)}` +
-    `&text2=Welcome%20to%20${encodeURIComponent(guild.name)}` +
-    `&text3=Member%20%23${guild.memberCount}`;
+  `background=https://i.imgur.com/kNP12kv.png` +
+  `&text1=${encodeURIComponent(member.user.username)}` +
+  `&text2=Welcome%20to%20${encodeURIComponent(guild.name)}` +
+  `&text3=Member%20%23${guild.memberCount}` +
+  `&avatar=${encodeURIComponent(member.user.displayAvatarURL({ extension: 'png', size: 256 }))}`;
 
   await welcomeChannel.send({
     content:
