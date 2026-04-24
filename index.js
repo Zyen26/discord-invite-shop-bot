@@ -2324,7 +2324,7 @@ if (isRepeatJoin) {
       );
 
     if (welcomeChannel) {
-  const imageUrl = `https://api.popcat.xyz/welcomecard?background=https://i.imgur.com/iu6UwVJ.png&text1=${encodeURIComponent(member.user.username)}&text2=Welcome&text3=Member%20%23${guild.memberCount}&avatar=${member.user.displayAvatarURL({ extension: 'png' })}`;
+  const imageUrl = `https://api.popcat.xyz/welcomecard?background=https://i.imgur.com/iu6UwVJ.png&text1=${encodeURIComponent(member.user.username)}&text2=Welcome&text3=Member%20%23${guild.memberCount}&avatar=${encodeURIComponent(member.user.displayAvatarURL({ extension: 'png' }))}`;
 
 const embed = new EmbedBuilder()
   .setColor(0xF1C40F)
@@ -2334,23 +2334,28 @@ const embed = new EmbedBuilder()
     `📈 **Their total invites:** ${updatedUser.invite_count}\n` +
     `${isRepeatJoin ? '⚠️ **Repeat join:** no points added\n' : ''}`
   )
-  .setImage(imageUrl) // 👈 只保留这个
+  .setImage(imageUrl)
   .setTimestamp();
 
 await welcomeChannel.send({
   embeds: [embed]
 });
+}
 
-    try {
+try {
   await inviter.send(
-    `🎉 You successfully invited **${member.user.tag}** to join **${guild.name}**!\nYou earned **1 point**.\nCurrent points: **${updatedUser.points}**\nTotal invites: **${updatedUser.invite_count}**`
+    `🎉 You successfully invited **${member.user.tag}** to join **${guild.name}**!\n` +
+    `You earned **1 point**.\n` +
+    `Current points: **${updatedUser.points}**\n` +
+    `Total invites: **${updatedUser.invite_count}**`
   );
 } catch (dmErr) {
   console.error(`Failed to DM inviter ${inviter.tag}:`, dmErr.message);
 }
-  } catch (err) {
-    console.error('GuildMemberAdd invite tracking error:', err);
-  }
+
+} catch (err) {
+  console.error('GuildMemberAdd invite tracking error:', err);
+}
 });
 
 client.on(Events.GuildMemberRemove, async (member) => {
