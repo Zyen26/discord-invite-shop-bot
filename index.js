@@ -2342,10 +2342,6 @@ if (welcomeChannel) {
         `📈 Their total invites: ${updatedUser.invite_count}\n` +
         `${isRepeatJoin ? '⚠️ Repeat join: no points added\n' : ''}`,
 
-      thumbnail: {
-        url: member.user.displayAvatarURL({ size: 256 })
-      },
-
       image: {
         url: imageUrl
       },
