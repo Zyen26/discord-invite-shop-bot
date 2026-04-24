@@ -352,41 +352,36 @@ function saveInviteRecord(invitedUserId, inviterId) {
   });
 }
 
-async function getOrCreateUser(userId) {
+function getOrCreateUser(userId) {
   return new Promise((resolve, reject) => {
-    db.get(
-      `SELECT * FROM users WHERE user_id = ?`,
-      [userId],
-      (err, row) => {
-        if (err) {
-          console.error('getOrCreateUser error:', err.message);
-          return reject(err);
-        }
+    try {
+      let row = db.prepare(`
+        SELECT * FROM users WHERE user_id = ?
+      `).get(userId);
 
-        if (row) {
-          return resolve(row);
-        }
-
-        // 如果用户不存在就创建
-        db.run(
-          `INSERT INTO users (user_id, points, invite_count)
-           VALUES (?, 0, 0)`,
-          [userId],
-          function (insertErr) {
-            if (insertErr) {
-              console.error('create user error:', insertErr.message);
-              return reject(insertErr);
-            }
-
-            resolve({
-              user_id: userId,
-              points: 0,
-              invite_count: 0
-            });
-          }
-        );
+      if (row) {
+        resolve(row);
+        return;
       }
-    );
+
+      db.prepare(`
+        INSERT INTO users (user_id, points, invite_count)
+        VALUES (?, 0, 0)
+      `).run(userId);
+
+      row = db.prepare(`
+        SELECT * FROM users WHERE user_id = ?
+      `).get(userId);
+
+      resolve(row || {
+        user_id: userId,
+        points: 0,
+        invite_count: 0
+      });
+    } catch (err) {
+      console.error('getOrCreateUser error:', err.message);
+      reject(err);
+    }
   });
 }
 
