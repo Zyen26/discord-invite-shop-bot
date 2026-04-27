@@ -1875,19 +1875,21 @@ async function handleSecurityLogs(interaction, page = 1, forcedLimit = 10, filte
     : `sec_logs_next_${safePage}`;
 
   const navRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId(prevId)
-      .setLabel('Previous')
-      .setEmoji('⬅️')
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(safePage <= 1),
-    new ButtonBuilder()
-      .setCustomId(nextId)
-      .setLabel('Next')
-      .setEmoji('➡️')
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(safePage >= totalPages)
-  );
+  new ButtonBuilder()
+    .setCustomId('logs_prev')
+    .setLabel('⬅️ Previous')
+    .setStyle(ButtonStyle.Secondary),
+
+  new ButtonBuilder()
+    .setCustomId('logs_next')
+    .setLabel('Next ➡️')
+    .setStyle(ButtonStyle.Secondary),
+
+  new ButtonBuilder()
+    .setCustomId('logs_refresh')
+    .setLabel('🔄 Refresh')
+    .setStyle(ButtonStyle.Primary)
+);
 
   if (interaction.isButton()) {
     return interaction.update({
@@ -2241,7 +2243,13 @@ client.on(Events.GuildMemberAdd, async (member) => {
 
     const existing = await hasInviteRecord(member.id);
     const isRepeatJoin = !!existing;
-
+    if (isRepeatJoin) {
+  await logAction(
+    inviter.id,
+    'REPEAT_JOIN',
+    `user:${member.id} rejoined | no points added`
+  );
+}
     const accountAgeDays =
       (Date.now() - member.user.createdTimestamp) / (1000 * 60 * 60 * 24);
 
@@ -2624,6 +2632,41 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return handleSecurityLogs(interaction, currentPage + 1, 10, filteredUserId);
       }
 
+      if (interaction.customId === 'logs_refresh') {
+        const page = 0;
+
+        const logs = await getSecurityLogs();
+
+        const embed = buildSecurityLogsEmbed(logs, page);
+      embed.setFooter({
+      text: `Showing ${Math.min(logs.length, 10)} logs on this page • Total logs loaded: ${logs.length} • Last updated: ${new Date().toLocaleTimeString()}`
+  });
+
+  await interaction.update({
+    embeds: [embed],
+    components: [
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('logs_prev')
+          .setLabel('⬅️ Previous')
+          .setStyle(ButtonStyle.Secondary),
+
+        new ButtonBuilder()
+          .setCustomId('logs_next')
+          .setLabel('Next ➡️')
+          .setStyle(ButtonStyle.Secondary),
+
+        new ButtonBuilder()
+          .setCustomId('logs_refresh')
+          .setLabel('🔄 Refresh')
+          .setStyle(ButtonStyle.Primary)
+      )
+    ]
+  });
+
+  return;
+}
+      
       if (customId.startsWith('sec_reset_')) {
         const userId = customId.replace('sec_reset_', '');
         return handleSecurityReset(interaction, userId);
