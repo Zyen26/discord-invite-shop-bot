@@ -10,12 +10,9 @@ const {
   ButtonStyle,
   ModalBuilder,
   TextInputBuilder,
-  TextInputStyle,
-  AttachmentBuilder // 👈 加这个
+  TextInputStyle
 } = require('discord.js');
 const db = require('./database');
-
-const { createCanvas, loadImage } = require('@napi-rs/canvas');
 
 const inviteTracker = new Map();
 
@@ -2210,68 +2207,6 @@ client.on(Events.InviteDelete, async (invite) => {
   }
 });
 
-async function generateWelcomeCard(member, guild) {
-  const width = 900;
-  const height = 380;
-
-  const canvas = createCanvas(width, height);
-  const ctx = canvas.getContext('2d');
-
-  // 背景
-  const bg = await loadImage('https://i.imgur.com/kNP12kv.png');
-  ctx.drawImage(bg, 0, 0, width, height);
-
-  // 暗色遮罩，让文字更清楚
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
-  ctx.fillRect(0, 0, width, height);
-
-  // 金色边框
-  ctx.strokeStyle = '#FFD700';
-  ctx.lineWidth = 6;
-  ctx.strokeRect(8, 8, width - 16, height - 16);
-
-  // 头像
-  const avatarUrl = member.user.displayAvatarURL({ extension: 'png', size: 256 });
-  const avatar = await loadImage(avatarUrl);
-
-  const avatarX = width / 2 - 70;
-  const avatarY = 45;
-  const avatarSize = 140;
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(avatarX + avatarSize / 2, avatarY + avatarSize / 2, avatarSize / 2, 0, Math.PI * 2);
-  ctx.closePath();
-  ctx.clip();
-  ctx.drawImage(avatar, avatarX, avatarY, avatarSize, avatarSize);
-  ctx.restore();
-
-  // 头像金色圆框
-  ctx.beginPath();
-  ctx.arc(avatarX + avatarSize / 2, avatarY + avatarSize / 2, avatarSize / 2 + 5, 0, Math.PI * 2);
-  ctx.strokeStyle = '#FFD700';
-  ctx.lineWidth = 6;
-  ctx.stroke();
-
-  // username 金色，字体细一点
-  ctx.fillStyle = '#FFD700';
-  ctx.font = '500 42px Arial';
-  ctx.textAlign = 'center';
-  ctx.fillText(member.user.username, width / 2, 235);
-
-  // welcome text
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = '400 28px Arial';
-  ctx.fillText(`Welcome to ${guild.name}`, width / 2, 275);
-
-  // member number
-  ctx.fillStyle = '#FFD700';
-  ctx.font = '400 22px Arial';
-  ctx.fillText(`Member #${guild.memberCount}`, width / 2, 315);
-
-  return canvas.toBuffer('image/png');
-}
-
 client.on(Events.GuildMemberAdd, async (member) => {
   try {
     const guild = member.guild;
@@ -2389,38 +2324,39 @@ if (isRepeatJoin) {
   );
 
 if (welcomeChannel) {
-  const welcomeCard = await generateWelcomeCard(member, guild);
-  const attachment = new AttachmentBuilder(welcomeCard, {
-    name: 'welcome-card.png'
-  });
+  const imageUrl = `https://api.popcat.xyz/welcomecard?` +
+  `background=https://i.imgur.com/kNP12kv.png` +
+  `&text1=${encodeURIComponent(member.user.username)}` +
+  `&text2=Welcome%20to%20${encodeURIComponent(guild.name)}` +
+  `&text3=Member%20%23${guild.memberCount}` +
+  `&avatar=${encodeURIComponent(member.user.displayAvatarURL({ extension: 'png', size: 256 }))}`;
 
   await welcomeChannel.send({
-    content: `${member} Have fun and don't rage quit 😆`,
+  content: `${member} Have fun and don't rage quit 😆`,
 
-    embeds: [
-      {
-        color: 0xFFD700,
+  embeds: [
+    {
+      color: 0xFFD700,
 
-        author: {
-          name: `Welcome to ${guild.name}! 🎉`,
-          icon_url: member.user.displayAvatarURL({ size: 64 })
-        },
+      title: `Welcome to ${guild.name}! 🎉`,
 
-        description:
-          `👤 Invited by: <@${inviter.id}>\n` +
-          `📈 Their total invites: ${updatedUser.invite_count}\n` +
-          `${isRepeatJoin ? '⚠️ Repeat join detected no points added\n' : ''}`,
+      thumbnail: {
+        url: member.user.displayAvatarURL({ size: 64 })
+      },
 
-        image: {
-          url: 'attachment://welcome-card.png'
-        },
+      description:
+        `👤 Invited by: <@${inviter.id}>\n` +
+        `📈 Their total invites: ${updatedUser.invite_count}\n` +
+        `${isRepeatJoin ? '⚠️ **Repeat join detected no points added**\n' : ''}`,
 
-        timestamp: new Date()
-      }
-    ],
+      image: {
+        url: imageUrl
+      },
 
-    files: [attachment]
-  });
+      timestamp: new Date()
+    }
+  ]
+});
 }
 
 try {
