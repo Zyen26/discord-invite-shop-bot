@@ -2332,15 +2332,22 @@ if (welcomeChannel) {
   `&avatar=${encodeURIComponent(member.user.displayAvatarURL({ extension: 'png', size: 256 }))}`;
 
   await welcomeChannel.send({
+  content: `${member} just joined the server`,
+
   embeds: [
     {
       color: 0xFFD700,
 
+      title: `Welcome to ${guild.name}! 🎉`,
+
+      thumbnail: {
+        url: member.user.displayAvatarURL({ size: 256 })
+      },
+
       description:
-        `**Hey ${member}, welcome to ${guild.name}!** 🎉\n\n` +
-        `👤 Invited by: <@${inviter.id}>\n` +
-        `📈 Their total invites: ${updatedUser.invite_count}\n` +
-        `${isRepeatJoin ? '⚠️ Repeat join: no points added\n' : ''}`,
+        `👤 **Invited by:** ${inviter ? `<@${inviter.id}>` : 'Unknown'}\n` +
+        `📈 **Their total invites:** ${updatedUser.invite_count}\n` +
+        `${isRepeatJoin ? '⚠️ **Repeat join detected (no points added)**\n' : ''}`,
 
       image: {
         url: imageUrl
