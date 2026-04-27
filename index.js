@@ -2341,7 +2341,7 @@ if (welcomeChannel) {
       title: `Welcome to ${guild.name}! 🎉`,
 
       thumbnail: {
-        url: member.user.displayAvatarURL({ size: 64 })
+        icon_url: member.user.displayAvatarURL({ size: 64 })
       },
 
       description:
