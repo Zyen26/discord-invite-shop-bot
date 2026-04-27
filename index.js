@@ -2382,15 +2382,21 @@ client.on(Events.GuildMemberRemove, async (member) => {
     const guild = member.guild;
 
     const leaveChannel =
-      guild.systemChannel ||
-      guild.channels.cache.find(
-        ch => ch.isTextBased?.() && ch.name === 'welcome'
-      ) ||
-      guild.channels.cache.find(
-        ch => ch.isTextBased?.() && ch.name === 'general'
-      );
+  (WELCOME_CHANNEL_ID
+    ? guild.channels.cache.get(WELCOME_CHANNEL_ID) ||
+      await guild.channels.fetch(WELCOME_CHANNEL_ID).catch(() => null)
+    : null) ||
+  guild.channels.cache.find(
+    ch => ch.isTextBased?.() && ch.name === 'welcome'
+  ) ||
+  guild.channels.cache.find(
+    ch => ch.isTextBased?.() && ch.name === 'general'
+  ) ||
+
+  guild.systemChannel;
 
     if (leaveChannel) {
+      console.log('Member left:', member.user.tag, 'channel:', leaveChannel?.name);
       await leaveChannel.send({
         embeds: [
           {
