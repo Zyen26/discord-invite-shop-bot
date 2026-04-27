@@ -2338,16 +2338,15 @@ if (welcomeChannel) {
     {
       color: 0xFFD700,
 
-      title: `Welcome to ${guild.name}! 🎉`,
-
-      thumbnail: {
-        url: member.user.displayAvatarURL({ size: 64 })
+      author: {
+        name: `Welcome to ${guild.name}! 🎉`,
+        icon_url: member.user.displayAvatarURL({ size: 64 })
       },
 
       description:
         `👤 Invited by: <@${inviter.id}>\n` +
         `📈 Their total invites: ${updatedUser.invite_count}\n` +
-        `${isRepeatJoin ? '⚠️ **Repeat join detected no points added**\n' : ''}`,
+        `${isRepeatJoin ? '⚠️ Repeat join detected no points added\n' : ''}`,
 
       image: {
         url: imageUrl
