@@ -2341,16 +2341,16 @@ if (welcomeChannel) {
     title: `Welcome to ${guild.name}! 🎉`,
 
     thumbnail: {
-      url: member.user.displayAvatarURL({ size: 128 }) // 👈 小头像在左上
+      url: member.user.displayAvatarURL({ size: 128 }) // 👈 左上小头像
     },
 
     description:
-      `👤 **Invited by:** <@${inviter.id}>\n` +
-      `📈 **Their total invites:** ${updatedUser.invite_count}\n` +
-      `${isRepeatJoin ? '⚠️ **Repeat join detected (no points added)**\n' : ''}`,
+      `👤 Invited by: <@${inviter.id}>\n` +
+      `📈 Their total invites: ${updatedUser.invite_count}\n` +
+      `${isRepeatJoin ? '⚠️ **Repeat join detected no points added**\n' : ''}`,
 
     image: {
-      url: imageUrl // 👈 这个是下面那张 welcome 图
+      url: imageUrl
     },
 
     timestamp: new Date()
@@ -2377,9 +2377,37 @@ try {
 
 client.on(Events.GuildMemberRemove, async (member) => {
   try {
+    if (member.user.bot) return;
+
+    const guild = member.guild;
+
+    const leaveChannel =
+      guild.systemChannel ||
+      guild.channels.cache.find(
+        ch => ch.isTextBased?.() && ch.name === 'welcome'
+      ) ||
+      guild.channels.cache.find(
+        ch => ch.isTextBased?.() && ch.name === 'general'
+      );
+
+    if (leaveChannel) {
+      await leaveChannel.send({
+        embeds: [
+          {
+            color: 0xFF4C4C,
+            description: `${member} just left the server 😢`,
+            thumbnail: {
+              url: member.user.displayAvatarURL({ size: 128 })
+            },
+            timestamp: new Date()
+          }
+        ]
+      });
+    }
+
     await updateServerStatsChannels(member.guild);
   } catch (err) {
-    console.error('GuildMemberRemove stats update error:', err.message);
+    console.error('GuildMemberRemove error:', err.message);
   }
 });
 
