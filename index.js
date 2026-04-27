@@ -2332,30 +2332,30 @@ if (welcomeChannel) {
   `&avatar=${encodeURIComponent(member.user.displayAvatarURL({ extension: 'png', size: 256 }))}`;
 
   await welcomeChannel.send({
-  content: `${member} just joined the server`,
+  content: `${member} Have fun and don't rage quit 😆`,
 
   embeds: [
-    {
-      color: 0xFFD700,
+  {
+    color: 0xFFD700,
 
-      title: `Welcome to ${guild.name}! 🎉`,
+    title: `Welcome to ${guild.name}! 🎉`,
 
-      thumbnail: {
-        url: member.user.displayAvatarURL({ size: 256 })
-      },
+    thumbnail: {
+      url: member.user.displayAvatarURL({ size: 128 }) // 👈 小头像在左上
+    },
 
-      description:
-        `👤 **Invited by:** ${inviter ? `<@${inviter.id}>` : 'Unknown'}\n` +
-        `📈 **Their total invites:** ${updatedUser.invite_count}\n` +
-        `${isRepeatJoin ? '⚠️ **Repeat join detected (no points added)**\n' : ''}`,
+    description:
+      `👤 **Invited by:** <@${inviter.id}>\n` +
+      `📈 **Their total invites:** ${updatedUser.invite_count}\n` +
+      `${isRepeatJoin ? '⚠️ **Repeat join detected (no points added)**\n' : ''}`,
 
-      image: {
-        url: imageUrl
-      },
+    image: {
+      url: imageUrl // 👈 这个是下面那张 welcome 图
+    },
 
-      timestamp: new Date()
-    }
-  ]
+    timestamp: new Date()
+  }
+]
 });
 }
 
