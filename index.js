@@ -2335,27 +2335,27 @@ if (welcomeChannel) {
   content: `${member} Have fun and don't rage quit 😆`,
 
   embeds: [
-  {
-    color: 0xFFD700,
+    {
+      color: 0xFFD700,
 
-    title: `Welcome to ${guild.name}! 🎉`,
+      title: `Welcome to ${guild.name}! 🎉`,
 
-    thumbnail: {
-      icon_url: member.user.displayAvatarURL({ size: 64 }) // 👈 小小圆头像
-    },
+      thumbnail: {
+        url: member.user.displayAvatarURL({ size: 64 })
+      },
 
-    description:
-      `👤 Invited by: <@${inviter.id}>\n` +
-      `📈 Their total invites: ${updatedUser.invite_count}\n` +
-      `${isRepeatJoin ? '⚠️ **Repeat join detected no points added**\n' : ''}`,
+      description:
+        `👤 Invited by: <@${inviter.id}>\n` +
+        `📈 Their total invites: ${updatedUser.invite_count}\n` +
+        `${isRepeatJoin ? '⚠️ **Repeat join detected no points added**\n' : ''}`,
 
-    image: {
-      url: imageUrl
-    },
+      image: {
+        url: imageUrl
+      },
 
-    timestamp: new Date()
-  }
-]
+      timestamp: new Date()
+    }
+  ]
 });
 }
 
@@ -2396,18 +2396,19 @@ client.on(Events.GuildMemberRemove, async (member) => {
   guild.systemChannel;
 
     if (leaveChannel) {
-      console.log('Member left:', member.user.tag, 'channel:', leaveChannel?.name);
-      await leaveChannel.send({
+  await leaveChannel.send({
+    embeds: [
+      {
+        color: 0x2f3136, // 深色（看起来像普通消息）
 
-      author: {
-        name: `${member.user.username} just left the server 😢`,
-        icon_url: member.user.displayAvatarURL({ size: 64 }) // 👈 小小圆头像
-      },
-
-      timestamp: new Date()
-    
-});
-    }
+        author: {
+          name: `${member.user.username} just left the server 😢`,
+          icon_url: member.user.displayAvatarURL({ size: 64 })
+        }
+      }
+    ]
+  });
+}
 
     await updateServerStatsChannels(member.guild);
   } catch (err) {
