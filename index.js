@@ -2341,7 +2341,7 @@ if (welcomeChannel) {
     title: `Welcome to ${guild.name}! 🎉`,
 
     thumbnail: {
-      url: member.user.displayAvatarURL({ size: 128 }) // 👈 左上小头像
+      icon_url: member.user.displayAvatarURL({ size: 64 }) // 👈 小小圆头像
     },
 
     description:
@@ -2398,17 +2398,15 @@ client.on(Events.GuildMemberRemove, async (member) => {
     if (leaveChannel) {
       console.log('Member left:', member.user.tag, 'channel:', leaveChannel?.name);
       await leaveChannel.send({
-        embeds: [
-          {
-            color: 0xFF4C4C,
-            description: `${member} just left the server 😢`,
-            thumbnail: {
-              url: member.user.displayAvatarURL({ size: 128 })
-            },
-            timestamp: new Date()
-          }
-        ]
-      });
+
+      author: {
+        name: `${member.user.username} just left the server 😢`,
+        icon_url: member.user.displayAvatarURL({ size: 64 }) // 👈 小小圆头像
+      },
+
+      timestamp: new Date()
+    
+});
     }
 
     await updateServerStatsChannels(member.guild);
