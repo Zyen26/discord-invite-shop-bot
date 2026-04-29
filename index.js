@@ -1876,17 +1876,17 @@ async function handleSecurityLogs(interaction, page = 1, forcedLimit = 10, filte
 
   const navRow = new ActionRowBuilder().addComponents(
   new ButtonBuilder()
-    .setCustomId('logs_prev')
+    .setCustomId(`logs_prev_${page}`)
     .setLabel('⬅️ Previous')
     .setStyle(ButtonStyle.Secondary),
 
   new ButtonBuilder()
-    .setCustomId('logs_next')
+    .setCustomId(`logs_next_${page}`)
     .setLabel('Next ➡️')
     .setStyle(ButtonStyle.Secondary),
 
   new ButtonBuilder()
-    .setCustomId('logs_refresh')
+    .setCustomId(`logs_refresh_${page}`)
     .setLabel('🔄 Refresh')
     .setStyle(ButtonStyle.Primary)
 );
@@ -2472,8 +2472,20 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (commandName === 'securitypanel') return handleSecurityPanel(interaction);
     }
 
-    if (interaction.isButton()) {
+      if (interaction.isButton()) {
       const { customId } = interaction;
+
+      if (customId === 'logs_prev') {
+      return await handleSecurityLogs(interaction, currentPage - 1);
+      }
+
+      if (customId === 'logs_next') {
+      return await handleSecurityLogs(interaction, currentPage + 1);
+      }
+
+      if (customId === 'logs_refresh') {
+      return await handleSecurityLogs(interaction, 1);
+      }
 
       if (customId === 'panel_leaderboard') {
         return handleLeaderboard(interaction);
@@ -2483,6 +2495,24 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return handlePoints(interaction);
       }
 
+      if (customId.startsWith('logs_')) {
+    const parts = customId.split('_');
+    const action = parts[1];      // prev / next / refresh
+    const currentPage = parseInt(parts[2] || '1');
+
+    if (action === 'prev') {
+      return await handleSecurityLogs(interaction, currentPage - 1);
+    }
+
+    if (action === 'next') {
+      return await handleSecurityLogs(interaction, currentPage + 1);
+    }
+
+    if (action === 'refresh') {
+      return await handleSecurityLogs(interaction, 1);
+    }
+  }
+  
       if (customId === 'open_partner_modal') {
         const modal = new ModalBuilder()
           .setCustomId('partner_modal')
